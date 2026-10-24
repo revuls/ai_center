@@ -44,7 +44,10 @@
       "prompt": "summarize-meeting",
       "outputKey": "summary",
       "x": 260,
-      "y": 140
+      "y": 140,
+      "files": [
+        "meeting/summary.md"
+      ]
     },
     {
       "id": "check",
@@ -67,7 +70,10 @@
         "tone": "friendly"
       },
       "x": 840,
-      "y": 140
+      "y": 140,
+      "files": [
+        "meeting/follow-up-email.md"
+      ]
     },
     {
       "id": "end",

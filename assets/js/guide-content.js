@@ -88,6 +88,16 @@ A workflow is a **graph** of connected nodes. You design it by dragging pieces o
 - \`{{prev}}\` → result of the connected steps.
 - Each step automatically receives the previous result (configurable: previous / all / none).
 
+## Output files
+
+When a step must produce files, list them in **📄 Output files** (e.g. \`docs/design/{{feature}}.md\`). The AI returns each file in its own block tagged \`file=<path>\`, and:
+
+- **In the app**, the run shows *Generated files*: view them, download a ZIP or *Write to folder…* into your repository.
+- **In the CLI**, they are saved in \`runs/<run>/files/\`; \`--write-files <dir>\` also writes them into that folder.
+- **Agents with tools** (Copilot agent mode, coding agent, Claude Code) create them directly in the repository.
+
+Unsafe paths (absolute or with \`..\`) are always ignored, and declared files the AI did not return appear as *Missing files* in the report.
+
 ## Running
 
 | Where | How | Best for |

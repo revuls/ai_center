@@ -112,6 +112,8 @@ Full specification: [docs/FORMAT.md](docs/FORMAT.md).
 | **Copilot coding agent** | Assign an issue: «Run the workflow in `.github/prompts/wf-<id>.prompt.md` with …». It reads `AGENTS.md`. |
 | **CLI** | `node cli/aic.mjs run <id> --input key=value --provider copilot` |
 
+**Steps that must produce files**: list them in the step's **📄 Output files** field (e.g. `docs/design/{{feature}}.md`). The AI returns each file in a `file=<path>` block; the app lets you download them or write them into your repository, the CLI saves them in `runs/<run>/files/` (add `--write-files <dir>` to write them into a folder), and agents with tools create them directly in the repo. Details in [docs/FORMAT.md](docs/FORMAT.md#output-files).
+
 CLI providers: `manual` · `copilot` (Copilot CLI, runs tools in your repo) · `claude-code` · `anthropic` · `github` (GitHub Models) · `openai` · `azure` · `ollama`.
 
 ## CLI
@@ -123,6 +125,7 @@ node cli/aic.mjs bundle                                 # regenerate library/lib
 node cli/aic.mjs export copilot m365 --out ../my-repo   # generate native files
 node cli/aic.mjs runbook feature-e2e --flavor copilot   # E2E runbook of a workflow
 node cli/aic.mjs run bugfix --input symptoms="…" --provider copilot --cwd ../my-repo
+node cli/aic.mjs run meeting-to-actions --input meeting="…" --provider github --write-files ../my-repo
 node cli/aic.mjs agents-md                              # regenerate this repo's AGENTS.md
 ```
 

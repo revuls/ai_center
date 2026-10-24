@@ -167,6 +167,7 @@
       if (n.type === 'condition' && n.question) chips.push(h('span', { class: 'chip', title: n.question }, '❓ ' + n.question.slice(0, 40)));
       if (n.type === 'human') chips.push(h('span', { class: 'chip' }, '⏸ awaits approval'));
       if (n.outputKey) chips.push(h('span', { class: 'chip accent mono', title: 'Output name' }, '→ {{' + n.outputKey + '}}'));
+      if (C.arr(n.files).length) chips.push(h('span', { class: 'chip mono', title: C.arr(n.files).join('\n') }, '📄 ' + (C.arr(n.files).length === 1 ? C.arr(n.files)[0] : C.arr(n.files).length + ' files')));
       if (n.type === 'step' && !n.agent && !n.prompt && !n.instructions) chips.push(h('span', { class: 'chip', style: { borderStyle: 'dashed' } }, 'Drop an agent or prompt here'));
       if (chips.length) el.append(h('div', { class: 'n-body' }, ...chips));
       if (n.type !== 'start') el.append(h('div', { class: 'port in', title: 'Input' }));
@@ -485,6 +486,10 @@
         const ta = target(); if (!ta) return; ta.focus(); ta.setRangeText('{{' + x.t + '}}', ta.selectionStart, ta.selectionEnd, 'end'); ta.dispatchEvent(new Event('input'));
       } }, '{{' + x.t + '}}')));
     }
+    function filesField(n) {
+      const w = V.tagInput(C.arr(n.files), (v) => { commit(); n.files = v.length ? v : undefined; refreshNode(); }, { list: true, placeholder: 'docs/{{name}}.md and press Enter' });
+      return fld('📄 Output files', w, 'Files this step must produce (relative paths, {{variables}} allowed). The AI returns each one in a `file=<path>` block; runs save them to runs/<run>/files/ and agents write them into the repo.');
+    }
     function attachRow(type, idv, onRemove) {
       const it = S.get(type, idv);
       return h('div', { class: 'attach-row', style: { borderLeft: `3px solid ${typeColor(type)}` } },
@@ -539,6 +544,7 @@
         E.append(fld('📝 Step instructions', instr), tokensHelp(n, () => instr));
         E.append(h('div', { style: { height: '12px' } }));
         E.append(fld('🎁 Expected deliverable', txt(n, 'deliverable', { placeholder: 'e.g. User story in Gherkin format', live: false })));
+        E.append(filesField(n));
         E.append(fld('🧩 Skills', listAttach(n, 'skill')));
         E.append(fld('📚 Knowledge', listAttach(n, 'knowledge')));
         E.append(fld('🔌 MCP tools', listAttach(n, 'mcp')));
@@ -564,6 +570,7 @@
       if (n.type === 'end') {
         E.append(fld('Final consolidation (optional)', txt(n, 'instructions', { area: true, rows: 4, placeholder: 'If filled in, an agent will generate the final summary with these instructions.' })));
         E.append(fld('Final deliverable', txt(n, 'deliverable', { placeholder: 'e.g. PR ready for review' })));
+        E.append(filesField(n));
         E.append(fld('🤖 Closing agent (optional)', refSelect('agent', n.agent, (v) => { commit(); n.agent = v || undefined; refreshNode(); })));
       }
       E.append(h('div', { class: 'row', style: { marginTop: '16px', borderTop: '1px solid var(--border)', paddingTop: '12px' } },

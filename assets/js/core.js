@@ -727,6 +727,48 @@
   }
 
   /* ------------------------------------------------------------------ *
+   * Output files: a step can declare files it must produce. The AI returns
+   * each one as a fenced block tagged `file=<path>`; the engine extracts them.
+   * ------------------------------------------------------------------ */
+  /** Normalizes a relative path and rejects anything that could escape the target folder. */
+  function safeRelPath(p) {
+    let s = String(p || '').trim().replace(/\\/g, '/').replace(/^["'`]|["'`]$/g, '');
+    if (!s || /^[a-zA-Z]:/.test(s) || s.startsWith('/') || s.startsWith('~')) return null;
+    const parts = [];
+    for (const seg of s.split('/')) {
+      if (!seg || seg === '.') continue;
+      if (seg === '..' || /[\u0000-\u001f<>:"|?*]/.test(seg)) return null;
+      parts.push(seg);
+    }
+    return parts.length ? parts.join('/') : null;
+  }
+  /** Declared output files of a node, with {{variables}} resolved. */
+  function nodeFiles(node, ctx) {
+    return arr(node.files).map((p) => render(p, ctx || {}, { fallback: (n) => n })).map((p) => p.trim()).filter(Boolean);
+  }
+  const FILE_BLOCK_RE = /^(`{3,}|~{3,})[^\n]*?\bfile=(?:"([^"\n]+)"|'([^'\n]+)'|([^\s`]+))[^\n]*\n([\s\S]*?)\n?^\1[ \t]*$/gm;
+  /** Extracts `file=<path>` fenced blocks from an AI answer. Unsafe paths are reported, never returned as files. */
+  function extractFiles(text) {
+    const files = []; const rejected = [];
+    String(text || '').replace(/\r\n/g, '\n').replace(FILE_BLOCK_RE, (m, fence, p1, p2, p3, body) => {
+      const raw = p1 || p2 || p3;
+      const path = safeRelPath(raw);
+      if (!path) { rejected.push(raw); return m; }
+      const content = body.endsWith('\n') ? body : body + '\n';
+      const i = files.findIndex((f) => f.path === path);
+      if (i >= 0) files[i] = { path, content }; else files.push({ path, content });
+      return m;
+    });
+    return { files, rejected };
+  }
+  function filesInstructions(paths) {
+    return 'Produce these files (paths relative to the repository root):\n\n' + paths.map((p) => `- \`${p}\``).join('\n') +
+      '\n\nReturn **each file complete** in its own fenced block that opens with four backticks, the language and `file=<path>`, for example:\n\n' +
+      '`````text\n````markdown file=' + paths[0] + '\n…file content…\n````\n`````\n\n' +
+      'If you have tools that write files, also write them at those paths. Do not omit any file and do not truncate their content.';
+  }
+
+  /* ------------------------------------------------------------------ *
    * Prompt composition for running a step
    * ------------------------------------------------------------------ */
   function resolveNode(lib, node) {
@@ -801,6 +843,8 @@
     }
     if (!node.instructions && !r.prompt && node.type === 'step') usr.push(section('Your task', `Perform the workflow step «${title}» using your role and the available context.`));
     if (node.deliverable) usr.push(section('Expected deliverable', render(node.deliverable, ctx)));
+    const outFiles = nodeFiles(node, ctx);
+    if (outFiles.length && (node.type === 'step' || node.type === 'end')) usr.push(section('Output files', filesInstructions(outFiles)));
     if (extra.options) {
       usr.push(section('Decision', `${node.instructions ? '' : (node.question || 'Evaluate the context and decide how to continue.') + '\n\n'}Answer on the **first line** with only one of these options: ${extra.options.map((o) => `\`${o}\``).join(', ')}. Then briefly justify it.`));
     }
@@ -814,7 +858,8 @@
       agent: r.agent ? r.agent.id : null,
       prompt: r.prompt ? r.prompt.id : null,
       skills: r.skills.map((s) => s.id), knowledge: r.knowledge.map((k) => k.id), mcp: r.mcp.map((m) => m.id),
-      model: (r.agent && r.agent.model) || (r.prompt && r.prompt.model) || ''
+      model: (r.agent && r.agent.model) || (r.prompt && r.prompt.model) || '',
+      files: outFiles
     };
   }
   /** Composed prompt for using an agent on its own (outside workflows). */
@@ -923,7 +968,16 @@
         break;
       }
       step.finishedAt = new Date().toISOString();
-      run.results[id] = { output: step.output, title: step.title, key: node.outputKey || '' };
+      if ((node.type === 'step' || (node.type === 'end' && step.prompt)) && step.output) {
+        const ex = extractFiles(step.output);
+        const expected = step.prompt && step.prompt.files ? step.prompt.files.map(safeRelPath).filter(Boolean) : [];
+        if (ex.files.length) step.files = ex.files;
+        if (ex.rejected.length) { step.rejectedFiles = ex.rejected; emit('warn', { message: `«${step.title}»: ignored unsafe file paths: ${ex.rejected.join(', ')}` }); }
+        const missing = expected.filter((p) => !ex.files.some((f) => f.path === p));
+        if (missing.length) step.missingFiles = missing;
+        if (step.files) emit('step:files', step);
+      }
+      run.results[id] = { output: step.output, title: step.title, key: node.outputKey || '', files: (step.files || []).map((f) => f.path) };
       done.add(id);
       emit('step:done', step);
       next.forEach((e) => { if (!queue.includes(e.to)) queue.push(e.to); });
@@ -932,6 +986,12 @@
     run.finishedAt = new Date().toISOString();
     emit('run:done', run);
     return run;
+  }
+  /** Latest version of every file produced during a run (later steps/attempts win). */
+  function runFiles(run) {
+    const map = new Map();
+    (run.steps || []).forEach((s) => (s.files || []).forEach((f) => map.set(f.path, { path: f.path, content: f.content, step: s.title, attempt: s.attempt || 1 })));
+    return Array.from(map.values()).sort((a, b) => a.path.localeCompare(b.path));
   }
   function runReport(run, wf) {
     const lines = [`# Run report · ${run.workflowName}`, '',
@@ -946,6 +1006,18 @@
       if (s.output && s.type !== 'start') lines.push(String(s.output).trim(), '');
       if (s.error) lines.push(`**Error:** ${s.error}`, '');
     });
+    const all = runFiles(run);
+    if (all.length) {
+      lines.push('## Generated files', '');
+      all.forEach((f) => lines.push(`- \`${f.path}\` — ${f.step}${f.attempt > 1 ? ` (attempt ${f.attempt})` : ''}`));
+      lines.push('');
+    }
+    const missing = run.steps.filter((s) => s.missingFiles && s.missingFiles.length);
+    if (missing.length) {
+      lines.push('## Missing files', '', '_Declared by the step but not returned by the AI:_', '');
+      missing.forEach((s) => s.missingFiles.forEach((p) => lines.push(`- \`${p}\` — ${s.title}`)));
+      lines.push('');
+    }
     if (run.final) lines.push('## Final result', '', run.final, '');
     return lines.join('\n');
   }
@@ -976,6 +1048,8 @@
       if (n.type === 'step' && !n.agent && !n.prompt && !n.instructions) add('warn', `${label} has no agent, prompt or instructions.`, n);
       if (n.type === 'condition' && out[n.id].length < 2) add('warn', `${label} is a decision with fewer than 2 outputs.`, n);
       if (n.type === 'condition' && out[n.id].some((e) => !e.label)) add('info', `${label}: label the decision outputs (e.g. «yes» / «no»).`, n);
+      arr(n.files).forEach((p) => { if (!safeRelPath(render(p, {}, { fallback: 'x' }))) add('error', `${label}: invalid output file path «${p}» (use a relative path without ..).`, n); });
+      if (arr(n.files).length && !['step', 'end'].includes(n.type)) add('warn', `${label}: only steps and the end node can produce output files.`, n);
     });
     const back = backEdges(wf);
     (wf.edges || []).forEach((e) => {
@@ -1197,6 +1271,12 @@
         L2.push('<details><summary>Full prompt to paste into Copilot</summary>', '', '````markdown', convertVars(c.full, 'm365').replace(/«([^»]+)»/g, '[$1]'), '````', '', '</details>', '');
       }
       if (n.deliverable) L2.push(`**Deliverable**: ${n.deliverable}`, '');
+      const rf = arr(n.files);
+      if (rf.length && (n.type === 'step' || n.type === 'end')) {
+        L2.push(flavor === 'm365'
+          ? `**Output files**: ask Copilot to return each file in its own block and save them as ${rf.map((p) => '`' + p + '`').join(', ')}.`
+          : `**Output files** — create or update these files (paths relative to the repository root; \`{{name}}\` = value of that input or step output):\n\n${rf.map((p) => '- `' + p + '`').join('\n')}`, '');
+      }
       const outs = (out[n.id] || []);
       if (outs.length) {
         const txt = outs.map((e) => {
@@ -1474,7 +1554,8 @@
     libraryFromFiles, libraryToFiles, serializeBundle, parseBundle, sortItems, indexLib, usagesOf,
     extractVars, render, convertVars,
     wfMaps, startNodes, backEdges, linearize, autoLayout, reachable, isReject, nodeLabel,
-    resolveNode, composeStep, composeAgent, runWorkflow, runReport,
+    resolveNode, composeStep, composeAgent, runWorkflow, runReport, runFiles,
+    safeRelPath, nodeFiles, extractFiles,
     lint, validateWorkflow,
     workflowRunbook, agentsMd, mermaid, m365Package, m365Instructions, agentBuilderGuide,
     exportCopilot, exportClaude, exportCursor, exportM365, exportGeneric, exportTargets

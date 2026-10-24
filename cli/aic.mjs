@@ -180,8 +180,9 @@ ${c.b('Usage')}  node cli/aic.mjs <command> [options]
                                    Targets: copilot · m365 · claude · cursor · generic
   ${c.cy('runbook')} <workflow> [--flavor copilot|claude|m365|generic]
                                    Print the E2E runbook of a workflow
-  ${c.cy('run')} <workflow> [--input key=value ...] [--provider p] [--model m] [--auto-approve] [--cwd dir]
-                                   Run a workflow end to end
+  ${c.cy('run')} <workflow> [--input key=value ...] [--provider p] [--model m] [--auto-approve] [--cwd dir] [--write-files dir]
+                                   Run a workflow end to end. Output files go to runs/<run>/files/;
+                                   --write-files also writes them into <dir> (e.g. your repository)
                                    Providers: manual (default) · copilot (Copilot CLI) · claude-code · anthropic
                                               github (GitHub Models) · openai · azure · ollama
   ${c.cy('new')} <type> "<name>"               Create an item from a template
@@ -263,6 +264,17 @@ async function main() {
       const stamp = new Date().toISOString().replace(/[:.]/g, '-');
       const runDir = path.join(runsDir, `${stamp}-${wf.id}`);
       fs.mkdirSync(runDir, { recursive: true });
+      const writeTo = flags['write-files'] ? path.resolve(flags['write-files'] === true ? '.' : flags['write-files']) : null;
+      const saveFiles = (files) => files.forEach((f) => {
+        const rel = C.safeRelPath(f.path);
+        if (!rel) return;
+        writeOut(path.join(runDir, 'files'), rel, f.content);
+        if (writeTo) {
+          const target = path.resolve(writeTo, rel);
+          if (target.startsWith(writeTo + path.sep)) writeOut(writeTo, rel, f.content);
+        }
+        console.log(c.dim('    📄 ' + rel + (writeTo ? ' → ' + path.relative(process.cwd(), path.join(writeTo, rel)) : '')));
+      });
       console.log(`\n${c.b('▶ ' + wf.name)} ${c.dim('· provider ' + provider + ' · ' + path.relative(process.cwd(), runDir))}`);
       let n = 0;
       const run = await C.runWorkflow(lib, wf, inputs, {
@@ -287,6 +299,8 @@ async function main() {
             n++;
             fs.writeFileSync(path.join(runDir, `${String(n).padStart(2, '0')}-${C.slugify(d.title)}.md`), `# ${d.title}\n\n${d.decision ? `> Decision: ${d.decision}\n\n` : ''}${d.output || ''}\n`);
             console.log(`${c.g('  ✔')} ${d.title}${d.decision ? c.dim(' → ' + d.decision) : ''}`);
+            if (d.files) saveFiles(d.files);
+            if (d.missingFiles) console.log(c.y('    ⚠ missing files: ' + d.missingFiles.join(', ')));
           }
           if (type === 'step:error') console.log(c.r('  ✖ ' + d.title + ': ' + d.error));
           if (type === 'warn') console.log(c.y('  ⚠ ' + d.message));
@@ -294,6 +308,8 @@ async function main() {
       });
       fs.writeFileSync(path.join(runDir, 'run.json'), JSON.stringify(run, null, 2));
       fs.writeFileSync(path.join(runDir, 'REPORT.md'), C.runReport(run, wf));
+      const produced = C.runFiles(run);
+      if (produced.length) console.log(`\n${c.b('📄 ' + produced.length + ' file(s)')} ${c.dim('→ ' + path.relative(process.cwd(), path.join(runDir, 'files')) + (writeTo ? ' and ' + (path.relative(process.cwd(), writeTo) || '.') : ''))}`);
       console.log(`\n${run.status === 'completed' ? c.g('🎉 Completed') : c.r('⚠ ' + run.status + (run.error ? ': ' + run.error : ''))} · report: ${path.relative(process.cwd(), path.join(runDir, 'REPORT.md'))}`);
       if (rl) rl.close();
       process.exit(run.status === 'completed' ? 0 : 1);

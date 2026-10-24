@@ -76,7 +76,10 @@
       "outputKey": "design",
       "deliverable": "Technical design, ADR if applicable and implementation plan",
       "x": 840,
-      "y": 240
+      "y": 240,
+      "files": [
+        "docs/design/technical-design.md"
+      ]
     },
     {
       "id": "design_ok",
@@ -145,7 +148,10 @@
       "deliverable": "PR description and release notes",
       "context": "all",
       "x": 2580,
-      "y": 150
+      "y": 150,
+      "files": [
+        "docs/release-notes.md"
+      ]
     },
     {
       "id": "final_ok",

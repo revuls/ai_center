@@ -103,7 +103,8 @@ Never store secrets: use `${input:NAME}`.
     { "id": "start", "type": "start", "title": "Start", "x": 40, "y": 200 },
     { "id": "n1", "type": "step", "title": "Refine", "agent": "product-owner", "prompt": "refine-idea",
       "skills": [], "knowledge": [], "mcp": [], "instructions": "Use {{idea}}", "deliverable": "…",
-      "outputKey": "stories", "context": "prev", "vars": { "idea": "{{idea}}" }, "x": 260, "y": 180 },
+      "outputKey": "stories", "context": "prev", "vars": { "idea": "{{idea}}" },
+      "files": ["docs/stories/{{idea_slug}}.md"], "x": 260, "y": 180 },
     { "id": "h1", "type": "human", "title": "Approval", "owner": "PO", "instructions": "…" },
     { "id": "c1", "type": "condition", "title": "OK?", "question": "…", "agent": "…" },
     { "id": "end", "type": "end", "title": "End", "instructions": "(optional) consolidation", "deliverable": "…" },
@@ -121,8 +122,27 @@ Never store secrets: use `${input:NAME}`.
 - **human**: stops. Approve → outputs without a rejection label. Reject → outputs labelled `changes`/`rejected`/`no` (or the previous step) with the feedback.
 - **condition**: the AI answers with one of the output labels on its first line; if it does not match, a person is asked.
 - **end**: if it has `instructions`, an agent consolidates the final result.
+- **files** (steps and end): files the step must produce, as relative paths (`{{variables}}` allowed). See *Output files* below.
 - Variables: `{{input}}`, `{{outputKey}}`, `{{prev}}`, `{{steps.<id>.output}}`.
 - Limit of 5 iterations per node to avoid infinite loops.
+
+### Output files
+
+When a step declares `files`, its prompt asks the AI to return **each file complete** in its own fenced block tagged with the path:
+
+`````text
+````markdown file=docs/design/technical-design.md
+# Technical design
+…
+````
+`````
+
+- Use four backticks so the file itself can contain code blocks.
+- The engine extracts every `file=<path>` block from the answer (even undeclared ones). Absolute paths, `..` and drive letters are rejected.
+- **App**: the run shows *Generated files* (view, download, ZIP, or *Write to folder…* into your repository). With the folder connected they are also saved in `runs/<run>/files/`.
+- **CLI**: files go to `runs/<run>/files/`; add `--write-files <dir>` to also write them into a folder (e.g. your repository).
+- **Agents with tools** (Copilot agent mode, coding agent, `--provider copilot` / `claude-code`): the runbook tells them to create the files directly in the repository.
+- Declared files that the AI did not return are listed as *Missing files* in the report.
 
 ## Other files
 

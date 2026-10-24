@@ -272,6 +272,7 @@
           const base = (this.rootDir === this.libDir ? '_runs/' : 'runs/') + run.id;
           await writeFile(this.rootDir, base + '/run.json', JSON.stringify(run, null, 2));
           await writeFile(this.rootDir, base + '/REPORT.md', report);
+          for (const f of AIC.core.runFiles(run)) await writeFile(this.rootDir, base + '/files/' + f.path, f.content);
           return base;
         } catch (e) { console.warn(e); }
       }
