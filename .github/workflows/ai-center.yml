@@ -1,0 +1,30 @@
+name: AI Center
+
+on:
+  pull_request:
+    paths: ['library/**', 'assets/js/core.js', 'cli/**']
+  push:
+    branches: [main]
+    paths: ['library/**']
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Validar la librería
+        run: node cli/aic.mjs lint
+      - name: Comprobar que el bundle está al día
+        run: |
+          node cli/aic.mjs bundle
+          # La fecha de generación cambia siempre: se compara sin la línea generatedAt
+          git diff -U0 library/library.bundle.js | grep -E '^[+-][^+-]' | grep -v generatedAt && { echo "::error::Ejecuta 'node cli/aic.mjs bundle' y sube library.bundle.js"; exit 1; } || true
+      - name: Generar exportaciones (artefacto)
+        run: node cli/aic.mjs export all --out dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ai-center-export
+          path: dist

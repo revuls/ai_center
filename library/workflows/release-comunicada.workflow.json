@@ -1,0 +1,141 @@
+{
+  "name": "Release comunicada",
+  "description": "Prepara una versión: release notes técnicas, comunicado para negocio/clientes e informe ejecutivo, con revisión antes de publicar.",
+  "icon": "📣",
+  "tags": [
+    "producto",
+    "documentacion",
+    "negocio"
+  ],
+  "audience": [
+    "po",
+    "negocio",
+    "dev"
+  ],
+  "targets": [
+    "copilot",
+    "m365",
+    "any"
+  ],
+  "status": "stable",
+  "version": "1.0.0",
+  "author": "AI Center",
+  "updated": "2026-10-24",
+  "inputs": [
+    {
+      "name": "version",
+      "label": "Versión",
+      "required": true
+    },
+    {
+      "name": "cambios",
+      "label": "Cambios incluidos",
+      "description": "Commits, PRs o historias",
+      "required": true
+    }
+  ],
+  "nodes": [
+    {
+      "id": "start",
+      "type": "start",
+      "title": "Inicio",
+      "x": 40,
+      "y": 200
+    },
+    {
+      "id": "tech",
+      "type": "step",
+      "title": "Release notes técnicas",
+      "agent": "tech-writer",
+      "prompt": "release-notes",
+      "vars": {
+        "audiencia": "técnico"
+      },
+      "outputKey": "notas_tecnicas",
+      "x": 260,
+      "y": 90
+    },
+    {
+      "id": "biz",
+      "type": "step",
+      "title": "Comunicado para negocio",
+      "agent": "asistente-negocio",
+      "prompt": "release-notes",
+      "vars": {
+        "audiencia": "negocio"
+      },
+      "outputKey": "comunicado",
+      "x": 260,
+      "y": 300
+    },
+    {
+      "id": "exec",
+      "type": "step",
+      "title": "Informe ejecutivo",
+      "agent": "asistente-negocio",
+      "prompt": "informe-ejecutivo",
+      "vars": {
+        "tema": "Versión {{version}}",
+        "audiencia": "dirección",
+        "datos": "{{notas_tecnicas}}\n\n{{comunicado}}"
+      },
+      "context": "all",
+      "x": 580,
+      "y": 190
+    },
+    {
+      "id": "ok",
+      "type": "human",
+      "title": "Revisión antes de publicar",
+      "owner": "Product Owner",
+      "x": 880,
+      "y": 200
+    },
+    {
+      "id": "end",
+      "type": "end",
+      "title": "Publicar",
+      "x": 1160,
+      "y": 210
+    }
+  ],
+  "edges": [
+    {
+      "id": "l1",
+      "from": "start",
+      "to": "tech"
+    },
+    {
+      "id": "l2",
+      "from": "start",
+      "to": "biz"
+    },
+    {
+      "id": "l3",
+      "from": "tech",
+      "to": "exec"
+    },
+    {
+      "id": "l4",
+      "from": "biz",
+      "to": "exec"
+    },
+    {
+      "id": "l5",
+      "from": "exec",
+      "to": "ok"
+    },
+    {
+      "id": "l6",
+      "from": "ok",
+      "to": "end",
+      "label": "aprobado"
+    },
+    {
+      "id": "l7",
+      "from": "ok",
+      "to": "exec",
+      "label": "cambios"
+    }
+  ]
+}

@@ -1,0 +1,261 @@
+{
+  "name": "Feature de principio a fin",
+  "description": "De una idea de negocio a una Pull Request lista: refinamiento con el PO, diseño técnico, implementación con tests, revisión de código, QA y documentación, con aprobaciones humanas en los hitos.",
+  "icon": "🚀",
+  "tags": [
+    "dev",
+    "producto",
+    "e2e"
+  ],
+  "audience": [
+    "dev",
+    "po",
+    "qa"
+  ],
+  "targets": [
+    "copilot",
+    "claude",
+    "m365",
+    "any"
+  ],
+  "status": "stable",
+  "version": "1.0.0",
+  "author": "AI Center",
+  "updated": "2026-10-24",
+  "inputs": [
+    {
+      "name": "idea",
+      "label": "Idea o necesidad",
+      "description": "Qué quiere conseguir negocio y para quién",
+      "required": true
+    },
+    {
+      "name": "contexto",
+      "label": "Contexto",
+      "description": "Restricciones, fechas, enlaces (opcional)",
+      "required": false
+    }
+  ],
+  "nodes": [
+    {
+      "id": "start",
+      "type": "start",
+      "title": "Inicio",
+      "x": 40,
+      "y": 260
+    },
+    {
+      "id": "refine",
+      "type": "step",
+      "title": "Refinar la idea en historias",
+      "agent": "product-owner",
+      "prompt": "refinar-historia",
+      "outputKey": "historias",
+      "deliverable": "Historias con criterios de aceptación en Gherkin y priorización",
+      "x": 260,
+      "y": 240
+    },
+    {
+      "id": "po_ok",
+      "type": "human",
+      "title": "Aprobación del PO",
+      "owner": "Product Owner",
+      "instructions": "Revisa que las historias reflejan la necesidad, que los criterios de aceptación son completos y que el alcance es correcto.",
+      "x": 560,
+      "y": 250
+    },
+    {
+      "id": "design",
+      "type": "step",
+      "title": "Diseño técnico",
+      "agent": "architect",
+      "prompt": "diseno-tecnico",
+      "vars": {
+        "historia": "{{historias}}"
+      },
+      "outputKey": "diseno",
+      "deliverable": "Diseño técnico, ADR si aplica y plan de implementación",
+      "x": 840,
+      "y": 240
+    },
+    {
+      "id": "design_ok",
+      "type": "human",
+      "title": "Validar diseño",
+      "owner": "Tech Lead",
+      "instructions": "Comprueba que el diseño encaja con la arquitectura, es seguro y el plan es realista.",
+      "x": 1140,
+      "y": 250
+    },
+    {
+      "id": "impl",
+      "type": "step",
+      "title": "Implementar con tests",
+      "agent": "developer",
+      "instructions": "Implementa las historias aprobadas siguiendo el diseño:\n\n{{diseno}}\n\nTrabaja en una rama nueva, en pasos pequeños, con tests en verde.",
+      "outputKey": "implementacion",
+      "deliverable": "Código y tests en una rama, resumen de cambios y mensaje de commit",
+      "context": "all",
+      "x": 1420,
+      "y": 240
+    },
+    {
+      "id": "review",
+      "type": "step",
+      "title": "Revisión de código",
+      "agent": "code-reviewer",
+      "instructions": "Revisa los cambios de la rama de implementación contra la historia y el diseño. La primera línea debe ser APROBADO o CAMBIOS NECESARIOS.",
+      "outputKey": "revision",
+      "x": 1720,
+      "y": 240
+    },
+    {
+      "id": "review_ok",
+      "type": "condition",
+      "title": "¿Revisión aprobada?",
+      "question": "¿El revisor ha dado el veredicto APROBADO (sin hallazgos bloqueantes)?",
+      "x": 2010,
+      "y": 250
+    },
+    {
+      "id": "qa",
+      "type": "step",
+      "title": "Validación QA",
+      "agent": "qa-engineer",
+      "prompt": "plan-de-pruebas",
+      "vars": {
+        "funcionalidad": "{{historias}}"
+      },
+      "instructions": "Diseña el plan de pruebas, automatiza los casos prioritarios y ejecútalos. Reporta defectos.",
+      "outputKey": "qa",
+      "context": "all",
+      "x": 2290,
+      "y": 150
+    },
+    {
+      "id": "docs",
+      "type": "step",
+      "title": "Documentar y preparar PR",
+      "agent": "tech-writer",
+      "prompt": "descripcion-pr",
+      "vars": {
+        "cambios": "{{implementacion}}"
+      },
+      "outputKey": "pr",
+      "deliverable": "Descripción de PR y release notes",
+      "context": "all",
+      "x": 2580,
+      "y": 150
+    },
+    {
+      "id": "final_ok",
+      "type": "human",
+      "title": "Revisión final",
+      "owner": "Equipo",
+      "instructions": "Revisa la PR completa (código, tests, QA y documentación) antes de abrirla/mergearla.",
+      "x": 2870,
+      "y": 160
+    },
+    {
+      "id": "end",
+      "type": "end",
+      "title": "PR lista",
+      "deliverable": "Pull Request lista para merge",
+      "x": 3150,
+      "y": 170
+    },
+    {
+      "id": "note1",
+      "type": "note",
+      "text": "💡 Ejecuta este workflow con Copilot en modo agente (/wf-feature-e2e) o desde la CLI con --provider copilot para que los pasos trabajen sobre tu repositorio.",
+      "x": 260,
+      "y": 470
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "from": "start",
+      "to": "refine"
+    },
+    {
+      "id": "e2",
+      "from": "refine",
+      "to": "po_ok"
+    },
+    {
+      "id": "e3",
+      "from": "po_ok",
+      "to": "design",
+      "label": "aprobado"
+    },
+    {
+      "id": "e4",
+      "from": "po_ok",
+      "to": "refine",
+      "label": "cambios"
+    },
+    {
+      "id": "e5",
+      "from": "design",
+      "to": "design_ok"
+    },
+    {
+      "id": "e6",
+      "from": "design_ok",
+      "to": "impl",
+      "label": "aprobado"
+    },
+    {
+      "id": "e7",
+      "from": "design_ok",
+      "to": "design",
+      "label": "cambios"
+    },
+    {
+      "id": "e8",
+      "from": "impl",
+      "to": "review"
+    },
+    {
+      "id": "e9",
+      "from": "review",
+      "to": "review_ok"
+    },
+    {
+      "id": "e10",
+      "from": "review_ok",
+      "to": "qa",
+      "label": "sí"
+    },
+    {
+      "id": "e11",
+      "from": "review_ok",
+      "to": "impl",
+      "label": "no"
+    },
+    {
+      "id": "e12",
+      "from": "qa",
+      "to": "docs"
+    },
+    {
+      "id": "e13",
+      "from": "docs",
+      "to": "final_ok"
+    },
+    {
+      "id": "e14",
+      "from": "final_ok",
+      "to": "end",
+      "label": "aprobado"
+    },
+    {
+      "id": "e15",
+      "from": "final_ok",
+      "to": "impl",
+      "label": "cambios"
+    }
+  ],
+  "notes": "Workflow de referencia del equipo para desarrollar una funcionalidad completa con agentes y control humano en los hitos."
+}

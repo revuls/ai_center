@@ -1,0 +1,26 @@
+{
+  "name": "Jira y Confluence",
+  "description": "Servidor MCP remoto de Atlassian: consulta y crea issues de Jira y páginas de Confluence. Ideal para PO y refinamiento.",
+  "icon": "🧾",
+  "transport": "sse",
+  "url": "https://mcp.atlassian.com/v1/sse",
+  "tags": [
+    "producto",
+    "jira"
+  ],
+  "audience": [
+    "po",
+    "dev",
+    "qa"
+  ],
+  "targets": [
+    "copilot",
+    "claude",
+    "cursor"
+  ],
+  "status": "review",
+  "version": "1.0.0",
+  "author": "AI Center",
+  "updated": "2026-10-24",
+  "notes": "Autenticación OAuth con tu cuenta de Atlassian. Permite al agente Product Owner crear historias directamente en Jira tras la aprobación humana."
+}

@@ -1,0 +1,25 @@
+{
+  "name": "GitHub",
+  "description": "Servidor MCP oficial de GitHub (remoto): issues, PRs, código, Actions y repositorios. Autenticación OAuth desde VS Code.",
+  "icon": "🐙",
+  "transport": "http",
+  "url": "https://api.githubcopilot.com/mcp/",
+  "tags": [
+    "dev",
+    "github"
+  ],
+  "audience": [
+    "dev",
+    "po"
+  ],
+  "targets": [
+    "copilot",
+    "claude",
+    "cursor"
+  ],
+  "status": "stable",
+  "version": "1.0.0",
+  "author": "AI Center",
+  "updated": "2026-10-24",
+  "notes": "Servidor remoto oficial. En VS Code la autenticación se hace con tu cuenta de GitHub. Permite a los agentes leer y crear issues y PRs, buscar código y consultar workflows de Actions."
+}

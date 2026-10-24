@@ -1,0 +1,28 @@
+{
+  "name": "Playwright (navegador)",
+  "description": "Controla un navegador para probar aplicaciones web, reproducir bugs y hacer pruebas E2E exploratorias.",
+  "icon": "🎭",
+  "transport": "stdio",
+  "command": "npx",
+  "args": [
+    "@playwright/mcp@latest"
+  ],
+  "tags": [
+    "qa",
+    "testing"
+  ],
+  "audience": [
+    "qa",
+    "dev"
+  ],
+  "targets": [
+    "copilot",
+    "claude",
+    "cursor"
+  ],
+  "status": "stable",
+  "version": "1.0.0",
+  "author": "AI Center",
+  "updated": "2026-10-24",
+  "notes": "Requiere Node.js. Útil para el agente QA: navegar, rellenar formularios, hacer capturas y verificar comportamientos."
+}

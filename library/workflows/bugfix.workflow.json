@@ -1,0 +1,157 @@
+{
+  "name": "Corrección de bug",
+  "description": "Del reporte de un bug a la corrección verificada: análisis de causa raíz, reproducción, fix mínimo con test de regresión y revisión.",
+  "icon": "🐞",
+  "tags": [
+    "dev",
+    "qa",
+    "bugs"
+  ],
+  "audience": [
+    "dev",
+    "qa"
+  ],
+  "targets": [
+    "copilot",
+    "claude",
+    "any"
+  ],
+  "status": "stable",
+  "version": "1.0.0",
+  "author": "AI Center",
+  "updated": "2026-10-24",
+  "inputs": [
+    {
+      "name": "sintomas",
+      "label": "Síntomas",
+      "description": "Qué ocurre, qué se esperaba y desde cuándo",
+      "required": true
+    },
+    {
+      "name": "logs",
+      "label": "Logs / trazas",
+      "description": "Opcional",
+      "required": false
+    }
+  ],
+  "nodes": [
+    {
+      "id": "start",
+      "type": "start",
+      "title": "Inicio",
+      "x": 40,
+      "y": 200
+    },
+    {
+      "id": "analyze",
+      "type": "step",
+      "title": "Analizar el bug",
+      "agent": "developer",
+      "prompt": "analizar-bug",
+      "outputKey": "analisis",
+      "x": 260,
+      "y": 180
+    },
+    {
+      "id": "repro",
+      "type": "condition",
+      "title": "¿Reproducible?",
+      "question": "¿El análisis indica que el bug es REPRODUCIBLE con la información disponible?",
+      "x": 560,
+      "y": 190
+    },
+    {
+      "id": "more_info",
+      "type": "human",
+      "title": "Pedir más información",
+      "instructions": "Aporta la información que falta (pasos, datos, entorno, logs) en los comentarios.",
+      "x": 840,
+      "y": 340
+    },
+    {
+      "id": "fix",
+      "type": "step",
+      "title": "Corregir con test de regresión",
+      "agent": "developer",
+      "instructions": "Escribe primero un test que reproduzca el bug, aplica la corrección mínima según el análisis:\n\n{{analisis}}\n\ny verifica que todos los tests pasan.",
+      "outputKey": "fix",
+      "x": 840,
+      "y": 100
+    },
+    {
+      "id": "review",
+      "type": "step",
+      "title": "Revisión",
+      "agent": "code-reviewer",
+      "instructions": "Revisa la corrección y el test de regresión. Comprueba efectos colaterales.",
+      "x": 1130,
+      "y": 100
+    },
+    {
+      "id": "ok",
+      "type": "human",
+      "title": "Aprobar corrección",
+      "instructions": "Valida la corrección antes de integrarla.",
+      "x": 1420,
+      "y": 110
+    },
+    {
+      "id": "end",
+      "type": "end",
+      "title": "Bug corregido",
+      "x": 1700,
+      "y": 120
+    }
+  ],
+  "edges": [
+    {
+      "id": "b1",
+      "from": "start",
+      "to": "analyze"
+    },
+    {
+      "id": "b2",
+      "from": "analyze",
+      "to": "repro"
+    },
+    {
+      "id": "b3",
+      "from": "repro",
+      "to": "fix",
+      "label": "sí"
+    },
+    {
+      "id": "b4",
+      "from": "repro",
+      "to": "more_info",
+      "label": "no"
+    },
+    {
+      "id": "b5",
+      "from": "more_info",
+      "to": "analyze"
+    },
+    {
+      "id": "b6",
+      "from": "fix",
+      "to": "review"
+    },
+    {
+      "id": "b7",
+      "from": "review",
+      "to": "ok"
+    },
+    {
+      "id": "b8",
+      "from": "ok",
+      "to": "end",
+      "label": "aprobado"
+    },
+    {
+      "id": "b9",
+      "from": "ok",
+      "to": "fix",
+      "label": "cambios"
+    }
+  ]
+}

@@ -1,0 +1,28 @@
+{
+  "name": "Sistema de ficheros",
+  "description": "Acceso de lectura/escritura a una carpeta local concreta para agentes que no tienen herramientas de ficheros nativas.",
+  "icon": "🗂️",
+  "transport": "stdio",
+  "command": "npx",
+  "args": [
+    "-y",
+    "@modelcontextprotocol/server-filesystem",
+    "."
+  ],
+  "tags": [
+    "dev"
+  ],
+  "audience": [
+    "dev"
+  ],
+  "targets": [
+    "claude",
+    "cursor",
+    "any"
+  ],
+  "status": "stable",
+  "version": "1.0.0",
+  "author": "AI Center",
+  "updated": "2026-10-24",
+  "notes": "Limita siempre la ruta permitida (último argumento). Copilot y Claude Code ya tienen herramientas de ficheros nativas."
+}

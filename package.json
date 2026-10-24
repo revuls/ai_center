@@ -1,0 +1,14 @@
+{
+  "name": "ai-center",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Framework del equipo para trabajar con IA: prompts, agentes, skills, conocimiento, MCP y workflows E2E en ficheros. Listo para GitHub Copilot, Copilot M365 y cualquier IA.",
+  "engines": { "node": ">=18" },
+  "scripts": {
+    "lint": "node cli/aic.mjs lint",
+    "bundle": "node cli/aic.mjs bundle",
+    "agents-md": "node cli/aic.mjs agents-md",
+    "export": "node cli/aic.mjs export all --out dist",
+    "check": "node cli/aic.mjs lint && node cli/aic.mjs bundle"
+  }
+}

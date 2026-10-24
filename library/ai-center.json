@@ -1,0 +1,11 @@
+{
+  "workspace": "AI Center",
+  "description": "El framework del equipo para trabajar con IA: prompts, agentes, skills, conocimiento, herramientas y workflows E2E en ficheros, listos para GitHub Copilot, Copilot M365 y cualquier IA.",
+  "organization": "Mi Organización",
+  "defaultTargets": [
+    "copilot",
+    "m365",
+    "any"
+  ],
+  "accentColor": "#6E56CF"
+}

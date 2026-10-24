@@ -1,0 +1,111 @@
+{
+  "name": "De idea a backlog priorizado",
+  "description": "Para Product Owners: analiza una iniciativa, la divide en historias, define criterios de aceptación y prioriza con RICE, con validación de negocio.",
+  "icon": "🧭",
+  "tags": [
+    "producto",
+    "agile"
+  ],
+  "audience": [
+    "po",
+    "negocio"
+  ],
+  "targets": [
+    "copilot",
+    "m365",
+    "any"
+  ],
+  "status": "stable",
+  "version": "1.0.0",
+  "author": "AI Center",
+  "updated": "2026-10-24",
+  "inputs": [
+    {
+      "name": "idea",
+      "label": "Iniciativa",
+      "required": true
+    },
+    {
+      "name": "objetivo",
+      "label": "Objetivo de negocio / OKR",
+      "required": false
+    }
+  ],
+  "nodes": [
+    {
+      "id": "start",
+      "type": "start",
+      "title": "Inicio",
+      "x": 40,
+      "y": 160
+    },
+    {
+      "id": "stories",
+      "type": "step",
+      "title": "Historias y criterios",
+      "agent": "product-owner",
+      "prompt": "refinar-historia",
+      "outputKey": "historias",
+      "x": 260,
+      "y": 140
+    },
+    {
+      "id": "prio",
+      "type": "step",
+      "title": "Priorizar con RICE",
+      "agent": "product-owner",
+      "prompt": "priorizar-backlog",
+      "vars": {
+        "elementos": "{{historias}}"
+      },
+      "outputKey": "priorizacion",
+      "x": 560,
+      "y": 140
+    },
+    {
+      "id": "biz_ok",
+      "type": "human",
+      "title": "Validación con negocio",
+      "owner": "Stakeholders",
+      "x": 860,
+      "y": 150
+    },
+    {
+      "id": "end",
+      "type": "end",
+      "title": "Backlog listo",
+      "deliverable": "Historias priorizadas listas para refinamiento técnico",
+      "x": 1140,
+      "y": 160
+    }
+  ],
+  "edges": [
+    {
+      "id": "i1",
+      "from": "start",
+      "to": "stories"
+    },
+    {
+      "id": "i2",
+      "from": "stories",
+      "to": "prio"
+    },
+    {
+      "id": "i3",
+      "from": "prio",
+      "to": "biz_ok"
+    },
+    {
+      "id": "i4",
+      "from": "biz_ok",
+      "to": "end",
+      "label": "aprobado"
+    },
+    {
+      "id": "i5",
+      "from": "biz_ok",
+      "to": "stories",
+      "label": "cambios"
+    }
+  ]
+}
