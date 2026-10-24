@@ -1,9 +1,9 @@
 /*!
  * AI Center · core.js
- * Núcleo compartido entre la app (navegador, file://) y la CLI (Node).
- * Sin dependencias. Contiene: modelo de datos, formato de ficheros (frontmatter YAML / JSON),
- * plantillas, motor de workflows, composición de prompts, validación y exportadores
- * (GitHub Copilot, Copilot M365, Claude Code, Cursor, AGENTS.md genérico).
+ * Core shared by the app (browser, file://) and the CLI (Node).
+ * No dependencies. Contains: data model, file format (YAML frontmatter / JSON),
+ * templates, workflow engine, prompt composition, validation and exporters
+ * (GitHub Copilot, Copilot M365, Claude Code, Cursor, generic AGENTS.md).
  */
 (function (root, factory) {
   const api = factory();
@@ -16,50 +16,50 @@
   const VERSION = '1.0.0';
 
   /* ------------------------------------------------------------------ *
-   * Modelo
+   * Model
    * ------------------------------------------------------------------ */
   const TYPES = {
     workflow: {
       key: 'workflow', label: 'Workflows', singular: 'Workflow', dir: 'workflows', ext: '.workflow.json', format: 'json', icon: '🔀',
-      help: 'Flujos de trabajo E2E que encadenan agentes, prompts, skills, conocimiento y revisiones humanas. Se diseñan arrastrando piezas y los pueden ejecutar agentes.'
+      help: 'End-to-end flows that chain agents, prompts, skills, knowledge and human reviews. Designed by drag and drop and executable by agents.'
     },
     agent: {
-      key: 'agent', label: 'Agentes', singular: 'Agente', dir: 'agents', ext: '.agent.md', format: 'md', icon: '🤖',
-      help: 'Roles especializados (persona + instrucciones + herramientas + skills + conocimiento). Se exportan como custom agents de Copilot, agentes declarativos de M365 o subagentes de Claude.'
+      key: 'agent', label: 'Agents', singular: 'Agent', dir: 'agents', ext: '.agent.md', format: 'md', icon: '🤖',
+      help: 'Specialized roles (persona + instructions + tools + skills + knowledge). Exported as Copilot custom agents, M365 declarative agents or Claude subagents.'
     },
     prompt: {
       key: 'prompt', label: 'Prompts', singular: 'Prompt', dir: 'prompts', ext: '.prompt.md', format: 'md', icon: '💬',
-      help: 'Plantillas reutilizables con variables {{variable}}. Se exportan como prompt files de Copilot (/comando), comandos de Claude o texto listo para Copilot M365.'
+      help: 'Reusable templates with {{variables}}. Exported as Copilot prompt files (/command), Claude commands or ready-to-paste text for Copilot M365.'
     },
     skill: {
       key: 'skill', label: 'Skills', singular: 'Skill', dir: 'skills', ext: '/SKILL.md', format: 'skill', icon: '🧩',
-      help: 'Capacidades empaquetadas (formato estándar Agent Skills, SKILL.md) que un agente carga cuando las necesita: procedimientos, checklists, scripts y recursos.'
+      help: 'Packaged capabilities (open Agent Skills standard, SKILL.md) that an agent loads when needed: procedures, checklists, scripts and resources.'
     },
     instruction: {
-      key: 'instruction', label: 'Instrucciones', singular: 'Instrucción', dir: 'instructions', ext: '.instructions.md', format: 'md', icon: '📏',
-      help: 'Normas que la IA debe seguir siempre (globales) o para ciertos ficheros (applyTo). Se exportan a copilot-instructions.md, *.instructions.md, CLAUDE.md o reglas de Cursor.'
+      key: 'instruction', label: 'Instructions', singular: 'Instruction', dir: 'instructions', ext: '.instructions.md', format: 'md', icon: '📏',
+      help: 'Rules the AI must always follow (global) or for certain files (applyTo). Exported to copilot-instructions.md, *.instructions.md, CLAUDE.md or Cursor rules.'
     },
     knowledge: {
-      key: 'knowledge', label: 'Conocimiento', singular: 'Documento', dir: 'knowledge', ext: '.md', format: 'md', icon: '📚',
-      help: 'Contexto de negocio y técnico: glosario, arquitectura, Definition of Done, procesos… Se inyecta en agentes y pasos de workflows.'
+      key: 'knowledge', label: 'Knowledge', singular: 'Document', dir: 'knowledge', ext: '.md', format: 'md', icon: '📚',
+      help: 'Business and technical context: glossary, architecture, Definition of Done, processes… Injected into agents and workflow steps.'
     },
     mcp: {
-      key: 'mcp', label: 'Herramientas MCP', singular: 'Servidor MCP', dir: 'mcp', ext: '.mcp.json', format: 'json', icon: '🔌',
-      help: 'Servidores Model Context Protocol que dan herramientas a los agentes (GitHub, Jira, navegador, BBDD…). Se exportan a .vscode/mcp.json, .mcp.json o .cursor/mcp.json.'
+      key: 'mcp', label: 'MCP Tools', singular: 'MCP server', dir: 'mcp', ext: '.mcp.json', format: 'json', icon: '🔌',
+      help: 'Model Context Protocol servers that give agents tools (GitHub, Jira, browser, databases…). Exported to .vscode/mcp.json, .mcp.json or .cursor/mcp.json.'
     }
   };
   const TYPE_ORDER = ['workflow', 'agent', 'prompt', 'skill', 'instruction', 'knowledge', 'mcp'];
 
   const AUDIENCES = [
-    { value: 'todos', label: 'Todos' },
-    { value: 'dev', label: 'Desarrollo' },
-    { value: 'po', label: 'Producto (PO)' },
+    { value: 'all', label: 'Everyone' },
+    { value: 'dev', label: 'Development' },
+    { value: 'po', label: 'Product (PO)' },
     { value: 'qa', label: 'QA' },
-    { value: 'arquitectura', label: 'Arquitectura' },
-    { value: 'ux', label: 'Diseño / UX' },
-    { value: 'negocio', label: 'Negocio' },
-    { value: 'datos', label: 'Datos' },
-    { value: 'ops', label: 'DevOps / Plataforma' }
+    { value: 'architecture', label: 'Architecture' },
+    { value: 'ux', label: 'Design / UX' },
+    { value: 'business', label: 'Business' },
+    { value: 'data', label: 'Data' },
+    { value: 'ops', label: 'DevOps / Platform' }
   ];
   const TARGETS = [
     { value: 'copilot', label: 'GitHub Copilot' },
@@ -67,127 +67,127 @@
     { value: 'claude', label: 'Claude / Claude Code' },
     { value: 'chatgpt', label: 'ChatGPT' },
     { value: 'cursor', label: 'Cursor' },
-    { value: 'any', label: 'Cualquier IA' }
+    { value: 'any', label: 'Any AI' }
   ];
   const STATUS = [
-    { value: 'draft', label: 'Borrador' },
-    { value: 'review', label: 'En revisión' },
-    { value: 'stable', label: 'Estable' },
-    { value: 'deprecated', label: 'Obsoleto' }
+    { value: 'draft', label: 'Draft' },
+    { value: 'review', label: 'In review' },
+    { value: 'stable', label: 'Stable' },
+    { value: 'deprecated', label: 'Deprecated' }
   ];
   const PROMPT_MODES = [
-    { value: '', label: '— (por defecto)' },
-    { value: 'ask', label: 'ask · preguntar' },
-    { value: 'edit', label: 'edit · editar ficheros' },
-    { value: 'agent', label: 'agent · modo agente' }
+    { value: '', label: '— (default)' },
+    { value: 'ask', label: 'ask · ask questions' },
+    { value: 'edit', label: 'edit · edit files' },
+    { value: 'agent', label: 'agent · agent mode' }
   ];
   const KNOWLEDGE_KINDS = [
-    { value: 'glossary', label: 'Glosario' },
-    { value: 'architecture', label: 'Arquitectura' },
-    { value: 'process', label: 'Proceso' },
-    { value: 'guideline', label: 'Guía / buenas prácticas' },
-    { value: 'domain', label: 'Dominio de negocio' },
-    { value: 'template', label: 'Plantilla' },
-    { value: 'reference', label: 'Referencia' }
+    { value: 'glossary', label: 'Glossary' },
+    { value: 'architecture', label: 'Architecture' },
+    { value: 'process', label: 'Process' },
+    { value: 'guideline', label: 'Guideline / best practices' },
+    { value: 'domain', label: 'Business domain' },
+    { value: 'template', label: 'Template' },
+    { value: 'reference', label: 'Reference' }
   ];
   const COPILOT_TOOLS = ['search', 'edit', 'runCommands', 'runTasks', 'runTests', 'fetch', 'githubRepo', 'problems', 'changes', 'usages', 'testFailure', 'todos', 'new', 'extensions', 'vscodeAPI', 'openSimpleBrowser', 'think'];
   const M365_CAPS = [
-    { value: 'WebSearch', label: 'Búsqueda web' },
-    { value: 'OneDriveAndSharePoint', label: 'OneDrive y SharePoint' },
+    { value: 'WebSearch', label: 'Web search' },
+    { value: 'OneDriveAndSharePoint', label: 'OneDrive and SharePoint' },
     { value: 'GraphConnectors', label: 'Copilot connectors' },
-    { value: 'Email', label: 'Correo' },
-    { value: 'TeamsMessages', label: 'Mensajes de Teams' },
-    { value: 'Meetings', label: 'Reuniones' },
-    { value: 'People', label: 'Personas' },
-    { value: 'CodeInterpreter', label: 'Intérprete de código' },
-    { value: 'GraphicArt', label: 'Generación de imágenes' }
+    { value: 'Email', label: 'Email' },
+    { value: 'TeamsMessages', label: 'Teams messages' },
+    { value: 'Meetings', label: 'Meetings' },
+    { value: 'People', label: 'People' },
+    { value: 'CodeInterpreter', label: 'Code interpreter' },
+    { value: 'GraphicArt', label: 'Image generation' }
   ];
   const MCP_TRANSPORTS = [
-    { value: 'stdio', label: 'stdio (proceso local)' },
-    { value: 'http', label: 'http (remoto)' },
-    { value: 'sse', label: 'sse (remoto, legado)' }
+    { value: 'stdio', label: 'stdio (local process)' },
+    { value: 'http', label: 'http (remote)' },
+    { value: 'sse', label: 'sse (remote, legacy)' }
   ];
 
   const NODE_TYPES = {
-    start: { label: 'Inicio', icon: '▶', help: 'Punto de entrada. Recibe las entradas del workflow.' },
-    step: { label: 'Paso', icon: '⚙', help: 'Trabajo ejecutado por un agente/prompt con skills, conocimiento y herramientas.' },
-    human: { label: 'Revisión humana', icon: '🧑', help: 'Puerta de aprobación. El agente se detiene hasta que una persona aprueba o pide cambios.' },
-    condition: { label: 'Decisión', icon: '◆', help: 'Bifurca el flujo según un criterio. Las etiquetas de las conexiones son las opciones.' },
-    end: { label: 'Fin', icon: '■', help: 'Cierre del flujo y entregable final.' },
-    note: { label: 'Nota', icon: '✎', help: 'Anotación libre en el lienzo. No se ejecuta.' }
+    start: { label: 'Start', icon: '▶', help: 'Entry point. Receives the workflow inputs.' },
+    step: { label: 'Step', icon: '⚙', help: 'Work done by an agent/prompt with skills, knowledge and tools.' },
+    human: { label: 'Human review', icon: '🧑', help: 'Approval gate. The agent stops until a person approves or requests changes.' },
+    condition: { label: 'Decision', icon: '◆', help: 'Branches the flow based on a criterion. Connection labels are the options.' },
+    end: { label: 'End', icon: '■', help: 'Closes the flow and produces the final deliverable.' },
+    note: { label: 'Note', icon: '✎', help: 'Free annotation on the canvas. Not executed.' }
   };
 
   const F = (key, label, kind, extra) => Object.assign({ key, label, kind }, extra || {});
   const HEAD = [
-    F('name', 'Nombre', 'text', { required: true }),
-    F('description', 'Descripción', 'textarea', { required: true, help: 'Qué hace y cuándo usarlo. Los agentes y Copilot la usan para decidir cuándo aplicarlo.' }),
-    F('icon', 'Icono', 'emoji')
+    F('name', 'Name', 'text', { required: true }),
+    F('description', 'Description', 'textarea', { required: true, help: 'What it does and when to use it. Agents and Copilot read it to decide when to apply it.' }),
+    F('icon', 'Icon', 'emoji')
   ];
   const TAIL = [
-    F('tags', 'Etiquetas', 'tags'),
-    F('audience', 'Audiencia', 'multi', { options: AUDIENCES }),
-    F('targets', 'IAs objetivo', 'multi', { options: TARGETS }),
-    F('status', 'Estado', 'select', { options: STATUS }),
-    F('version', 'Versión', 'text', { placeholder: '1.0.0' }),
-    F('author', 'Autor/a', 'text'),
-    F('updated', 'Actualizado', 'readonly')
+    F('tags', 'Tags', 'tags'),
+    F('audience', 'Audience', 'multi', { options: AUDIENCES }),
+    F('targets', 'Target AIs', 'multi', { options: TARGETS }),
+    F('status', 'Status', 'select', { options: STATUS }),
+    F('version', 'Version', 'text', { placeholder: '1.0.0' }),
+    F('author', 'Author', 'text'),
+    F('updated', 'Updated', 'readonly')
   ];
   const FIELDS = {
     prompt: [...HEAD,
-      F('mode', 'Modo en Copilot', 'select', { options: PROMPT_MODES, help: 'Modo de chat con el que se abre el prompt file en Copilot.' }),
-      F('agent', 'Agente asociado', 'ref', { ref: 'agent', help: 'Opcional. El prompt se ejecuta con este agente (custom agent en Copilot).' }),
-      F('model', 'Modelo preferido', 'text', { placeholder: 'p. ej. Claude Sonnet 5.5, GPT-5…' }),
-      F('tools', 'Herramientas (Copilot)', 'tags', { suggest: COPILOT_TOOLS }),
+      F('mode', 'Copilot mode', 'select', { options: PROMPT_MODES, help: 'Chat mode used when the prompt file runs in Copilot.' }),
+      F('agent', 'Linked agent', 'ref', { ref: 'agent', help: 'Optional. The prompt runs with this agent (custom agent in Copilot).' }),
+      F('model', 'Preferred model', 'text', { placeholder: 'e.g. Claude Sonnet 5.5, GPT-5…' }),
+      F('tools', 'Tools (Copilot)', 'tags', { suggest: COPILOT_TOOLS }),
       ...TAIL],
     agent: [...HEAD,
-      F('model', 'Modelo preferido', 'text', { placeholder: 'p. ej. Claude Opus 5.5' }),
-      F('tools', 'Herramientas (Copilot)', 'tags', { suggest: COPILOT_TOOLS }),
+      F('model', 'Preferred model', 'text', { placeholder: 'e.g. Claude Opus 5.5' }),
+      F('tools', 'Tools (Copilot)', 'tags', { suggest: COPILOT_TOOLS }),
       F('skills', 'Skills', 'refs', { ref: 'skill' }),
-      F('knowledge', 'Conocimiento', 'refs', { ref: 'knowledge' }),
-      F('mcp', 'Servidores MCP', 'refs', { ref: 'mcp' }),
-      F('handoffs', 'Traspasos a otros agentes', 'refs', { ref: 'agent', help: 'Botones de handoff en Copilot para pasar el trabajo al siguiente agente.' }),
-      F('starters', 'Conversation starters', 'list', { help: 'Sugerencias iniciales (Copilot M365). Una por línea.' }),
-      F('capabilities', 'Capacidades M365', 'multi', { options: M365_CAPS }),
-      F('sharepointUrls', 'Fuentes SharePoint/OneDrive (M365)', 'list', { help: 'URLs de sitios o carpetas que el agente M365 usará como conocimiento.' }),
+      F('knowledge', 'Knowledge', 'refs', { ref: 'knowledge' }),
+      F('mcp', 'MCP servers', 'refs', { ref: 'mcp' }),
+      F('handoffs', 'Handoffs to other agents', 'refs', { ref: 'agent', help: 'Handoff buttons in Copilot to pass the work to the next agent.' }),
+      F('starters', 'Conversation starters', 'list', { help: 'Initial suggestions (Copilot M365). One per line.' }),
+      F('capabilities', 'M365 capabilities', 'multi', { options: M365_CAPS }),
+      F('sharepointUrls', 'SharePoint/OneDrive sources (M365)', 'list', { help: 'Site or folder URLs the M365 agent will use as knowledge.' }),
       ...TAIL],
     skill: [...HEAD,
-      F('license', 'Licencia', 'text'),
-      F('allowedTools', 'Herramientas permitidas', 'tags'),
+      F('license', 'License', 'text'),
+      F('allowedTools', 'Allowed tools', 'tags'),
       ...TAIL],
     instruction: [...HEAD,
-      F('global', 'Global (todo el repositorio)', 'bool', { help: 'Las globales van a copilot-instructions.md / CLAUDE.md / AGENTS.md.' }),
-      F('applyTo', 'Aplica a (glob)', 'text', { placeholder: '**/*.ts, src/api/**' }),
+      F('global', 'Global (whole repository)', 'bool', { help: 'Global ones go to copilot-instructions.md / CLAUDE.md / AGENTS.md.' }),
+      F('applyTo', 'Applies to (glob)', 'text', { placeholder: '**/*.ts, src/api/**' }),
       ...TAIL],
     knowledge: [...HEAD,
-      F('kind', 'Tipo', 'select', { options: KNOWLEDGE_KINDS }),
-      F('source', 'Fuente / URL', 'text'),
+      F('kind', 'Kind', 'select', { options: KNOWLEDGE_KINDS }),
+      F('source', 'Source / URL', 'text'),
       ...TAIL],
     mcp: [...HEAD,
-      F('transport', 'Transporte', 'select', { options: MCP_TRANSPORTS }),
-      F('command', 'Comando', 'text', { placeholder: 'npx' }),
-      F('args', 'Argumentos', 'list'),
+      F('transport', 'Transport', 'select', { options: MCP_TRANSPORTS }),
+      F('command', 'Command', 'text', { placeholder: 'npx' }),
+      F('args', 'Arguments', 'list'),
       F('url', 'URL', 'text', { placeholder: 'https://…' }),
-      F('env', 'Variables de entorno', 'kv', { help: 'Usa ${input:NOMBRE} para pedir secretos al usuario (nunca guardes secretos en ficheros).' }),
-      F('headers', 'Cabeceras HTTP', 'kv'),
+      F('env', 'Environment variables', 'kv', { help: 'Use ${input:NAME} to ask the user for secrets (never store secrets in files).' }),
+      F('headers', 'HTTP headers', 'kv'),
       ...TAIL],
     workflow: [...HEAD, ...TAIL]
   };
   const BODY_LABEL = {
-    prompt: 'Plantilla del prompt',
-    agent: 'Instrucciones del agente (system prompt)',
-    skill: 'Contenido de la skill (SKILL.md)',
-    instruction: 'Instrucciones',
-    knowledge: 'Contenido',
-    mcp: 'Notas de uso',
-    workflow: 'Notas / README del workflow'
+    prompt: 'Prompt template',
+    agent: 'Agent instructions (system prompt)',
+    skill: 'Skill content (SKILL.md)',
+    instruction: 'Instructions',
+    knowledge: 'Content',
+    mcp: 'Usage notes',
+    workflow: 'Workflow notes / README'
   };
 
   /* ------------------------------------------------------------------ *
-   * Utilidades
+   * Utilities
    * ------------------------------------------------------------------ */
   const slugify = (s) => String(s || '')
     .normalize('NFD').replace(/[̀-ͯ]/g, '')
-    .toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 64) || 'sin-nombre';
+    .toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 64) || 'untitled';
   const uniq = (a) => Array.from(new Set((a || []).filter((x) => x !== undefined && x !== null && x !== '')));
   const arr = (v) => Array.isArray(v) ? v : (v === undefined || v === null || v === '' ? [] : String(v).split(',').map((s) => s.trim()).filter(Boolean));
   const today = () => new Date().toISOString().slice(0, 10);
@@ -197,7 +197,7 @@
   const uid = (p) => (p || 'n') + Math.random().toString(36).slice(2, 8);
 
   function hashHex(str, len) {
-    // Hash determinista (FNV-1a extendido) → hex. Útil para IDs estables (manifest M365).
+    // Deterministic hash (extended FNV-1a) → hex. Used for stable IDs (M365 manifest).
     let out = '';
     let seed = 0;
     while (out.length < len) {
@@ -217,7 +217,7 @@
   }
 
   /* ------------------------------------------------------------------ *
-   * YAML (subconjunto suficiente para frontmatter) y frontmatter
+   * YAML (subset sufficient for frontmatter) and frontmatter
    * ------------------------------------------------------------------ */
   function splitInline(s) {
     const parts = []; let cur = ''; let depth = 0; let q = null;
@@ -390,11 +390,11 @@
   }
 
   /* ------------------------------------------------------------------ *
-   * Item ⇄ fichero
+   * Item ⇄ file
    * ------------------------------------------------------------------ */
   function pathFor(item) {
     const t = TYPES[item.type];
-    if (!t) throw new Error('Tipo desconocido: ' + item.type);
+    if (!t) throw new Error('Unknown type: ' + item.type);
     if (item.type === 'skill') return `skills/${item.id}/SKILL.md`;
     return `${t.dir}/${item.id}${t.ext}`;
   }
@@ -441,7 +441,7 @@
     let item;
     if (TYPES[c.type].format === 'json') {
       let data = {};
-      try { data = JSON.parse(text); } catch (e) { data = { name: c.id, description: '⚠ JSON inválido: ' + e.message }; }
+      try { data = JSON.parse(text); } catch (e) { data = { name: c.id, description: '⚠ Invalid JSON: ' + e.message }; }
       item = Object.assign({}, data, { type: c.type, id: c.id });
       item.body = data.notes || '';
       delete item.notes;
@@ -499,9 +499,9 @@
   }
 
   /* ------------------------------------------------------------------ *
-   * Librería (sistema de ficheros virtual)
+   * Library (virtual file system)
    * ------------------------------------------------------------------ */
-  const DEFAULT_CONFIG = { workspace: 'AI Center', description: 'Framework de trabajo con IA del equipo', defaultTargets: ['copilot', 'm365', 'any'] };
+  const DEFAULT_CONFIG = { workspace: 'AI Center', description: 'The team framework for working with AI', defaultTargets: ['copilot', 'm365', 'any'] };
 
   function libraryFromFiles(files) {
     const items = [];
@@ -528,8 +528,8 @@
   }
   function serializeBundle(lib) {
     const payload = { format: 'ai-center-bundle', version: VERSION, generatedAt: new Date().toISOString(), files: libraryToFiles(lib) };
-    return '/* AI Center · library.bundle.js\n * Instantánea generada automáticamente a partir de los ficheros de /library.\n' +
-      ' * Permite abrir index.html con doble clic (file://) y ver la librería sin servidor.\n * NO editar a mano: edita los ficheros .md/.json o usa la app.\n */\n' +
+    return '/* AI Center · library.bundle.js\n * Snapshot generated automatically from the files in /library.\n' +
+      ' * Lets you open index.html with a double click (file://) and browse the library without a server.\n * DO NOT edit by hand: edit the .md/.json files or use the app.\n */\n' +
       'window.AIC_BUNDLE = ' + JSON.stringify(payload, null, 1) + ';\n';
   }
   function parseBundle(text) {
@@ -537,7 +537,7 @@
     return JSON.parse(m ? m[1] : text);
   }
   function sortItems(items) {
-    return items.slice().sort((a, b) => (TYPE_ORDER.indexOf(a.type) - TYPE_ORDER.indexOf(b.type)) || String(a.name).localeCompare(String(b.name), 'es'));
+    return items.slice().sort((a, b) => (TYPE_ORDER.indexOf(a.type) - TYPE_ORDER.indexOf(b.type)) || String(a.name).localeCompare(String(b.name), 'en'));
   }
   function indexLib(lib) {
     const map = new Map();
@@ -552,15 +552,15 @@
     const it = normalizeItem(Object.assign(base, partial || {}));
     if (type === 'workflow' && !it.nodes.length) {
       it.nodes = [
-        { id: 'start', type: 'start', title: 'Inicio', x: 60, y: 180 },
-        { id: 'end', type: 'end', title: 'Fin', x: 640, y: 180 }
+        { id: 'start', type: 'start', title: 'Start', x: 60, y: 180 },
+        { id: 'end', type: 'end', title: 'End', x: 640, y: 180 }
       ];
-      it.inputs = [{ name: 'objetivo', label: 'Objetivo', description: '¿Qué quieres conseguir?', required: true }];
+      it.inputs = [{ name: 'goal', label: 'Goal', description: 'What do you want to achieve?', required: true }];
     }
     if (type === 'mcp' && !partial?.transport) it.transport = 'stdio';
     return it;
   }
-  /** Referencias inversas: ¿quién usa este item? */
+  /** Reverse references: who uses this item? */
   function usagesOf(lib, type, id) {
     const out = [];
     (lib.items || []).forEach((it) => {
@@ -579,7 +579,7 @@
   }
 
   /* ------------------------------------------------------------------ *
-   * Plantillas
+   * Templates
    * ------------------------------------------------------------------ */
   const VAR_RE = /\{\{\s*([a-zA-Z_ÁÉÍÓÚáéíóúñÑ][\wÁÉÍÓÚáéíóúñÑ.\-]*)\s*(?::\s*([^}]*?))?\s*\}\}/g;
   function extractVars(text) {
@@ -607,7 +607,7 @@
       return String(v);
     });
   }
-  /** Convierte {{var}} a la sintaxis de cada herramienta. */
+  /** Converts {{var}} into each tool's syntax. */
   function convertVars(text, flavor) {
     const vars = extractVars(text).filter((v) => !v.name.includes('.'));
     let i = 0;
@@ -628,7 +628,7 @@
   }
 
   /* ------------------------------------------------------------------ *
-   * Grafo de workflows
+   * Workflow graph
    * ------------------------------------------------------------------ */
   function wfMaps(wf) {
     const out = {}; const inc = {};
@@ -658,7 +658,7 @@
     execNodes(wf).forEach((n) => { if (!color[n.id]) visit(n.id); });
     return back;
   }
-  /** Orden lineal (topológico, ignorando retornos) para runbooks y vistas. */
+  /** Linear order (topological, ignoring loop-backs) for runbooks and views. */
   function linearize(wf) {
     const nodes = execNodes(wf);
     const back = backEdges(wf);
@@ -693,7 +693,7 @@
     }
     return seen;
   }
-  /** Distribución automática por capas (izquierda → derecha). */
+  /** Automatic layered layout (left → right). */
   function autoLayout(wf, opts) {
     opts = Object.assign({ dx: 290, dy: 150, x0: 60, y0: 60 }, opts || {});
     const order = linearize(wf);
@@ -716,7 +716,7 @@
     notes.forEach((n, i) => { n.x = opts.x0 + i * 240; n.y = opts.y0 + maxRows * opts.dy + 20; });
     return wf;
   }
-  const REJECT_RE = /rechaz|reject|cambio|volver|repet|rehacer|\bko\b|^no$|no aprob/i;
+  const REJECT_RE = /reject|change|rework|redo|back|retry|\bko\b|^no$|not approved|rechaz|cambio|volver|repet|rehacer|no aprob/i;
   const isReject = (label) => REJECT_RE.test(norm(label || ''));
   function nodeLabel(lib, n) {
     if (n.title) return n.title;
@@ -727,7 +727,7 @@
   }
 
   /* ------------------------------------------------------------------ *
-   * Composición de prompts para ejecutar un paso
+   * Prompt composition for running a step
    * ------------------------------------------------------------------ */
   function resolveNode(lib, node) {
     const L = indexLib(lib);
@@ -767,44 +767,44 @@
     const title = node.title || nodeLabel(lib, node);
 
     const sys = [];
-    if (r.agent) sys.push(`# Rol: ${r.agent.name}\n\n${r.agent.description ? '_' + r.agent.description + '_\n\n' : ''}${render(r.agent.body, ctx)}`.trim());
-    else sys.push('# Rol\n\nEres un asistente experto que ejecuta con rigor un paso de un workflow de trabajo con IA. Produces entregables completos, concretos y listos para usar.');
-    if (globals.length) sys.push('# Normas del equipo\n\n' + globals.map((g) => `## ${g.name}\n\n${g.body.trim()}`).join('\n\n'));
-    if (r.skills.length) sys.push('# Skills\n\nAplica estas skills cuando sean relevantes:\n\n' + r.skills.map((s) => `## Skill: ${s.name}\n\n_${s.description}_\n\n${s.body.trim()}`).join('\n\n'));
-    if (r.knowledge.length) sys.push('# Conocimiento de referencia\n\n' + r.knowledge.map((k) => `## ${k.name}\n\n${k.body.trim()}`).join('\n\n'));
-    if (r.mcp.length) sys.push('# Herramientas disponibles\n\n' + r.mcp.map((m) => `- **${m.name}** (MCP \`${m.id}\`): ${m.description}`).join('\n'));
+    if (r.agent) sys.push(`# Role: ${r.agent.name}\n\n${r.agent.description ? '_' + r.agent.description + '_\n\n' : ''}${render(r.agent.body, ctx)}`.trim());
+    else sys.push('# Role\n\nYou are an expert assistant who rigorously executes one step of an AI workflow. You produce complete, concrete, ready-to-use deliverables.');
+    if (globals.length) sys.push('# Team rules\n\n' + globals.map((g) => `## ${g.name}\n\n${g.body.trim()}`).join('\n\n'));
+    if (r.skills.length) sys.push('# Skills\n\nApply these skills when relevant:\n\n' + r.skills.map((s) => `## Skill: ${s.name}\n\n_${s.description}_\n\n${s.body.trim()}`).join('\n\n'));
+    if (r.knowledge.length) sys.push('# Reference knowledge\n\n' + r.knowledge.map((k) => `## ${k.name}\n\n${k.body.trim()}`).join('\n\n'));
+    if (r.mcp.length) sys.push('# Available tools\n\n' + r.mcp.map((m) => `- **${m.name}** (MCP \`${m.id}\`): ${m.description}`).join('\n'));
 
     const usr = [];
     usr.push(`# ${wf.name} · ${title}`);
-    if (wf.description) usr.push(section('Objetivo del workflow', wf.description));
+    if (wf.description) usr.push(section('Workflow goal', wf.description));
     const inputs = state.inputs || {};
     const inLines = (wf.inputs || []).map((i) => inputs[i.name] ? `- **${i.label || i.name}**: ${inputs[i.name]}` : '').filter(Boolean);
-    if (inLines.length) usr.push(section('Entradas', inLines.join('\n')));
+    if (inLines.length) usr.push(section('Inputs', inLines.join('\n')));
     const mode = node.context || 'prev';
     if (mode !== 'none') {
       const list = mode === 'all'
         ? (wf.nodes || []).filter((n) => state.results && state.results[n.id] && n.id !== node.id && n.type !== 'start')
         : ctx._prevNodes.filter((n) => n.type !== 'start');
       const txt = list.map((n) => `### ${n.title || nodeLabel(lib, n)}\n\n${String(state.results[n.id].output || '').trim()}`).filter((x) => x.trim()).join('\n\n');
-      if (txt) usr.push(section(mode === 'all' ? 'Resultados de los pasos anteriores' : 'Resultado del paso anterior', txt));
+      if (txt) usr.push(section(mode === 'all' ? 'Results of previous steps' : 'Result of the previous step', txt));
     }
-    if (state.feedback && state.feedback[node.id]) usr.push(section('⚠ Feedback de la revisión (incorpóralo)', state.feedback[node.id]));
-    if (node.instructions) usr.push(section('Tu tarea', render(node.instructions, ctx, { fallback: (n) => `«${n}»` })));
+    if (state.feedback && state.feedback[node.id]) usr.push(section('⚠ Review feedback (incorporate it)', state.feedback[node.id]));
+    if (node.instructions) usr.push(section('Your task', render(node.instructions, ctx, { fallback: (n) => `«${n}»` })));
     if (r.prompt) {
       const vars = {};
       extractVars(r.prompt.body).forEach((v) => {
         const mapped = node.vars && node.vars[v.name];
         if (mapped) vars[v.name] = render(mapped, ctx, { fallback: '' });
       });
-      const body = render(r.prompt.body, Object.assign({}, ctx, vars), { fallback: (n, ph) => `«${ph || n} (tómalo de las entradas o del contexto anterior)»` });
-      usr.push(section(node.instructions ? 'Prompt a aplicar' : 'Tu tarea', body));
+      const body = render(r.prompt.body, Object.assign({}, ctx, vars), { fallback: (n, ph) => `«${ph || n} (take it from the inputs or the previous context)»` });
+      usr.push(section(node.instructions ? 'Prompt to apply' : 'Your task', body));
     }
-    if (!node.instructions && !r.prompt && node.type === 'step') usr.push(section('Tu tarea', `Realiza el paso «${title}» del workflow usando tu rol y el contexto disponible.`));
-    if (node.deliverable) usr.push(section('Entregable esperado', render(node.deliverable, ctx)));
+    if (!node.instructions && !r.prompt && node.type === 'step') usr.push(section('Your task', `Perform the workflow step «${title}» using your role and the available context.`));
+    if (node.deliverable) usr.push(section('Expected deliverable', render(node.deliverable, ctx)));
     if (extra.options) {
-      usr.push(section('Decisión', `${node.instructions ? '' : (node.question || 'Evalúa el contexto y decide cómo continuar.') + '\n\n'}Responde en la **primera línea** únicamente con una de estas opciones: ${extra.options.map((o) => `\`${o}\``).join(', ')}. Después justifica brevemente.`));
+      usr.push(section('Decision', `${node.instructions ? '' : (node.question || 'Evaluate the context and decide how to continue.') + '\n\n'}Answer on the **first line** with only one of these options: ${extra.options.map((o) => `\`${o}\``).join(', ')}. Then briefly justify it.`));
     }
-    if (node.type === 'end') usr.push(section('Cierre', 'Consolida un resumen final del workflow: entregables, decisiones tomadas, riesgos y próximos pasos.'));
+    if (node.type === 'end') usr.push(section('Wrap-up', 'Consolidate a final summary of the workflow: deliverables, decisions made, risks and next steps.'));
 
     const system = sys.filter(Boolean).join('\n\n');
     const user = usr.filter(Boolean).join('\n\n');
@@ -817,14 +817,14 @@
       model: (r.agent && r.agent.model) || (r.prompt && r.prompt.model) || ''
     };
   }
-  /** Prompt compuesto para usar un agente "suelto" (fuera de workflows). */
+  /** Composed prompt for using an agent on its own (outside workflows). */
   function composeAgent(lib, agent) {
     const fake = { id: 'agent', name: agent.name, nodes: [{ id: 'x', type: 'step', agent: agent.id }], edges: [] };
     return composeStep(lib, fake, fake.nodes[0], {}).system;
   }
 
   /* ------------------------------------------------------------------ *
-   * Motor de ejecución E2E (navegador y CLI comparten este código)
+   * E2E execution engine (shared by the browser and the CLI)
    * hooks: llm(composed, info) → Promise<string>
    *        human({node, run, context, options}) → Promise<{approved, notes, output?}>
    *        choose({node, edges, answer}) → Promise<edge>
@@ -854,7 +854,7 @@
     emit('run:start', run);
     while (queue.length) {
       if (hooks.signal && hooks.signal.aborted) { run.status = 'cancelled'; break; }
-      if (++guard > 400) { run.status = 'error'; run.error = 'Demasiadas iteraciones (¿bucle infinito?)'; break; }
+      if (++guard > 400) { run.status = 'error'; run.error = 'Too many iterations (infinite loop?)'; break; }
       let idx = queue.findIndex((id) => {
         const others = queue.filter((q) => q !== id);
         const pend = reachable(wf, others, true);
@@ -865,27 +865,27 @@
       const node = nodes[id];
       if (!node || node.type === 'note') continue;
       visits[id] = (visits[id] || 0) + 1;
-      if (visits[id] > maxVisits) { emit('warn', { message: `«${node.title || id}» superó ${maxVisits} iteraciones; se omite.` }); continue; }
+      if (visits[id] > maxVisits) { emit('warn', { message: `«${node.title || id}» exceeded ${maxVisits} iterations; skipped.` }); continue; }
       const step = { nodeId: id, type: node.type, title: node.title || nodeLabel(lib, node), attempt: visits[id], status: 'running', startedAt: new Date().toISOString() };
       run.steps.push(step);
       emit('step:start', step);
       let next = out[id];
       try {
         if (node.type === 'start') {
-          step.output = (wf.inputs || []).map((i) => `- **${i.label || i.name}**: ${run.inputs[i.name] || '—'}`).join('\n') || 'Inicio del workflow.';
+          step.output = (wf.inputs || []).map((i) => `- **${i.label || i.name}**: ${run.inputs[i.name] || '—'}`).join('\n') || 'Workflow start.';
         } else if (node.type === 'human') {
           const ctx = buildContext(wf, node, run);
           const context = ctx._prevNodes.map((n) => `### ${n.title || nodeLabel(lib, n)}\n\n${run.results[n.id].output || ''}`).join('\n\n');
           step.context = context;
-          const res = hooks.human ? await hooks.human({ node, run, step, context, edges: out[id] }) : { approved: true, notes: 'Aprobado automáticamente' };
-          step.decision = res.approved ? 'aprobado' : 'cambios solicitados';
+          const res = hooks.human ? await hooks.human({ node, run, step, context, edges: out[id] }) : { approved: true, notes: 'Approved automatically' };
+          step.decision = res.approved ? 'approved' : 'changes requested';
           step.notes = res.notes || '';
-          step.output = res.output || (res.approved ? `✅ Aprobado. ${res.notes || ''}`.trim() : `🔁 Cambios solicitados: ${res.notes || ''}`);
+          step.output = res.output || (res.approved ? `✅ Approved. ${res.notes || ''}`.trim() : `🔁 Changes requested: ${res.notes || ''}`);
           const rejects = out[id].filter((e) => isReject(e.label));
           if (res.approved) next = out[id].filter((e) => !isReject(e.label));
           else {
             next = rejects.length ? rejects : (inc[id] || []).map((e) => ({ id: 'retry-' + e.from, from: id, to: e.from }));
-            next.forEach((e) => { run.feedback[e.to] = res.notes || 'Revisa y mejora el resultado.'; done.delete(e.to); });
+            next.forEach((e) => { run.feedback[e.to] = res.notes || 'Review and improve the result.'; done.delete(e.to); });
           }
         } else if (node.type === 'condition') {
           const options = out[id].map((e) => e.label || (nodes[e.to] && nodes[e.to].title) || e.to);
@@ -910,7 +910,7 @@
         } else {
           const composed = composeStep(lib, wf, node, run);
           step.prompt = composed;
-          if (!hooks.llm) throw new Error('No hay motor de ejecución configurado');
+          if (!hooks.llm) throw new Error('No execution engine configured');
           step.output = await hooks.llm(composed, { node, step, run, kind: 'step' });
           delete run.feedback[id];
         }
@@ -934,54 +934,54 @@
     return run;
   }
   function runReport(run, wf) {
-    const lines = [`# Informe de ejecución · ${run.workflowName}`, '',
-      `- **Estado**: ${run.status}`, `- **Inicio**: ${run.startedAt}`, `- **Fin**: ${run.finishedAt || '—'}`, ''];
+    const lines = [`# Run report · ${run.workflowName}`, '',
+      `- **Status**: ${run.status}`, `- **Started**: ${run.startedAt}`, `- **Finished**: ${run.finishedAt || '—'}`, ''];
     const ins = Object.keys(run.inputs || {});
-    if (ins.length) { lines.push('## Entradas', ''); ins.forEach((k) => lines.push(`- **${k}**: ${run.inputs[k]}`)); lines.push(''); }
-    lines.push('## Pasos', '');
+    if (ins.length) { lines.push('## Inputs', ''); ins.forEach((k) => lines.push(`- **${k}**: ${run.inputs[k]}`)); lines.push(''); }
+    lines.push('## Steps', '');
     run.steps.forEach((s, i) => {
-      lines.push(`### ${i + 1}. ${s.title}${s.attempt > 1 ? ` (intento ${s.attempt})` : ''}`, '');
-      lines.push(`_${(NODE_TYPES[s.type] || {}).label || s.type} · ${s.status}${s.decision ? ' · decisión: ' + s.decision : ''}_`, '');
+      lines.push(`### ${i + 1}. ${s.title}${s.attempt > 1 ? ` (attempt ${s.attempt})` : ''}`, '');
+      lines.push(`_${(NODE_TYPES[s.type] || {}).label || s.type} · ${s.status}${s.decision ? ' · decision: ' + s.decision : ''}_`, '');
       if (s.notes) lines.push(`> ${s.notes}`, '');
       if (s.output && s.type !== 'start') lines.push(String(s.output).trim(), '');
       if (s.error) lines.push(`**Error:** ${s.error}`, '');
     });
-    if (run.final) lines.push('## Resultado final', '', run.final, '');
+    if (run.final) lines.push('## Final result', '', run.final, '');
     return lines.join('\n');
   }
 
   /* ------------------------------------------------------------------ *
-   * Validación (salud de la librería)
+   * Validation (library health)
    * ------------------------------------------------------------------ */
   function validateWorkflow(lib, wf) {
     const issues = [];
     const L = indexLib(lib);
     const add = (level, msg, node) => issues.push({ level, type: 'workflow', id: wf.id, name: wf.name, msg, node: node ? node.id : undefined });
     const ex = execNodes(wf);
-    if (!ex.length) { add('warn', 'El workflow está vacío.'); return issues; }
-    if (!ex.some((n) => n.type === 'start')) add('warn', 'No tiene nodo de Inicio.');
-    if (!ex.some((n) => n.type === 'end')) add('info', 'No tiene nodo de Fin (recomendado para consolidar el entregable).');
+    if (!ex.length) { add('warn', 'The workflow is empty.'); return issues; }
+    if (!ex.some((n) => n.type === 'start')) add('warn', 'It has no Start node.');
+    if (!ex.some((n) => n.type === 'end')) add('info', 'It has no End node (recommended to consolidate the deliverable).');
     const { out, inc } = wfMaps(wf);
     const reach = reachable(wf, startNodes(wf).map((n) => n.id));
     ex.forEach((n) => {
       const label = `«${n.title || nodeLabel(lib, n)}»`;
-      if (!reach.has(n.id)) add('warn', `${label} no es alcanzable desde el inicio.`, n);
-      if (n.type !== 'end' && !out[n.id].length) add('warn', `${label} no tiene salida.`, n);
-      if (n.type !== 'start' && !inc[n.id].length) add('warn', `${label} no tiene entrada.`, n);
-      if (n.agent && !L.get('agent', n.agent)) add('error', `${label} usa un agente inexistente: ${n.agent}`, n);
-      if (n.prompt && !L.get('prompt', n.prompt)) add('error', `${label} usa un prompt inexistente: ${n.prompt}`, n);
-      arr(n.skills).forEach((s) => { if (!L.get('skill', s)) add('error', `${label} usa una skill inexistente: ${s}`, n); });
-      arr(n.knowledge).forEach((s) => { if (!L.get('knowledge', s)) add('error', `${label} usa conocimiento inexistente: ${s}`, n); });
-      arr(n.mcp).forEach((s) => { if (!L.get('mcp', s)) add('error', `${label} usa un MCP inexistente: ${s}`, n); });
-      if (n.type === 'step' && !n.agent && !n.prompt && !n.instructions) add('warn', `${label} no tiene agente, prompt ni instrucciones.`, n);
-      if (n.type === 'condition' && out[n.id].length < 2) add('warn', `${label} es una decisión con menos de 2 salidas.`, n);
-      if (n.type === 'condition' && out[n.id].some((e) => !e.label)) add('info', `${label}: etiqueta las salidas de la decisión (p. ej. «sí» / «no»).`, n);
+      if (!reach.has(n.id)) add('warn', `${label} is not reachable from the start.`, n);
+      if (n.type !== 'end' && !out[n.id].length) add('warn', `${label} has no outgoing connection.`, n);
+      if (n.type !== 'start' && !inc[n.id].length) add('warn', `${label} has no incoming connection.`, n);
+      if (n.agent && !L.get('agent', n.agent)) add('error', `${label} uses a missing agent: ${n.agent}`, n);
+      if (n.prompt && !L.get('prompt', n.prompt)) add('error', `${label} uses a missing prompt: ${n.prompt}`, n);
+      arr(n.skills).forEach((s) => { if (!L.get('skill', s)) add('error', `${label} uses a missing skill: ${s}`, n); });
+      arr(n.knowledge).forEach((s) => { if (!L.get('knowledge', s)) add('error', `${label} uses missing knowledge: ${s}`, n); });
+      arr(n.mcp).forEach((s) => { if (!L.get('mcp', s)) add('error', `${label} uses a missing MCP server: ${s}`, n); });
+      if (n.type === 'step' && !n.agent && !n.prompt && !n.instructions) add('warn', `${label} has no agent, prompt or instructions.`, n);
+      if (n.type === 'condition' && out[n.id].length < 2) add('warn', `${label} is a decision with fewer than 2 outputs.`, n);
+      if (n.type === 'condition' && out[n.id].some((e) => !e.label)) add('info', `${label}: label the decision outputs (e.g. «yes» / «no»).`, n);
     });
     const back = backEdges(wf);
     (wf.edges || []).forEach((e) => {
       if (!back.has(e.id)) return;
       const src = wf.nodes.find((n) => n.id === e.from);
-      if (src && !['human', 'condition'].includes(src.type)) add('warn', `Hay un bucle que vuelve desde «${src.title || src.id}» sin decisión ni revisión humana: podría no terminar.`, src);
+      if (src && !['human', 'condition'].includes(src.type)) add('warn', `There is a loop back from «${src.title || src.id}» without a decision or human review: it might never end.`, src);
     });
     return issues;
   }
@@ -992,33 +992,33 @@
     (lib.items || []).forEach((it) => {
       const add = (level, msg) => issues.push({ level, type: it.type, id: it.id, name: it.name, msg });
       const key = it.type + ':' + it.id;
-      if (seen[key]) add('error', 'ID duplicado.');
+      if (seen[key]) add('error', 'Duplicate ID.');
       seen[key] = true;
-      if (!it.description || it.description.length < 15) add('warn', 'Añade una descripción clara (cuándo usarlo): ayuda a personas y agentes a elegirlo.');
-      if (it.type !== 'workflow' && !String(it.body || '').trim() && it.type !== 'mcp') add('warn', 'El contenido está vacío.');
-      if (it.status === 'deprecated') add('info', 'Marcado como obsoleto.');
+      if (!it.description || it.description.length < 15) add('warn', 'Add a clear description (when to use it): it helps people and agents pick it.');
+      if (it.type !== 'workflow' && !String(it.body || '').trim() && it.type !== 'mcp') add('warn', 'The content is empty.');
+      if (it.status === 'deprecated') add('info', 'Marked as deprecated.');
       if (it.type === 'agent') {
-        it.skills.forEach((s) => { if (!L.get('skill', s)) add('error', `Skill inexistente: ${s}`); });
-        it.knowledge.forEach((s) => { if (!L.get('knowledge', s)) add('error', `Conocimiento inexistente: ${s}`); });
-        it.mcp.forEach((s) => { if (!L.get('mcp', s)) add('error', `MCP inexistente: ${s}`); });
-        it.handoffs.forEach((s) => { if (!L.get('agent', s)) add('error', `Handoff a agente inexistente: ${s}`); });
+        it.skills.forEach((s) => { if (!L.get('skill', s)) add('error', `Missing skill: ${s}`); });
+        it.knowledge.forEach((s) => { if (!L.get('knowledge', s)) add('error', `Missing knowledge: ${s}`); });
+        it.mcp.forEach((s) => { if (!L.get('mcp', s)) add('error', `Missing MCP server: ${s}`); });
+        it.handoffs.forEach((s) => { if (!L.get('agent', s)) add('error', `Handoff to a missing agent: ${s}`); });
         if (it.targets.includes('m365')) {
           const len = m365Instructions(lib, it).length;
-          if (len > 8000) add('warn', `Las instrucciones para Copilot M365 ocupan ${len} caracteres (máx. 8000). Se recortarán al exportar.`);
-          if (!it.starters.length) add('info', 'Añade conversation starters para Copilot M365.');
+          if (len > 8000) add('warn', `The Copilot M365 instructions are ${len} characters long (max 8000). They will be trimmed on export.`);
+          if (!it.starters.length) add('info', 'Add conversation starters for Copilot M365.');
         }
       }
-      if (it.type === 'prompt' && it.agent && !L.get('agent', it.agent)) add('error', `Agente inexistente: ${it.agent}`);
+      if (it.type === 'prompt' && it.agent && !L.get('agent', it.agent)) add('error', `Missing agent: ${it.agent}`);
       if (it.type === 'skill') {
-        if (!/^[a-z0-9]+(-[a-z0-9]+)*$/.test(it.id) || it.id.length > 64) add('error', 'El id de una skill debe ser minúsculas con guiones (máx. 64) según el estándar Agent Skills.');
-        if (it.description.length > 1024) add('warn', 'La descripción de una skill no debe superar 1024 caracteres.');
+        if (!/^[a-z0-9]+(-[a-z0-9]+)*$/.test(it.id) || it.id.length > 64) add('error', 'A skill id must be lowercase with hyphens (max 64) per the Agent Skills standard.');
+        if (it.description.length > 1024) add('warn', 'A skill description must not exceed 1024 characters.');
       }
-      if (it.type === 'instruction' && !it.global && !it.applyTo) add('info', 'Sin applyTo: se aplicará a todos los ficheros (**).');
+      if (it.type === 'instruction' && !it.global && !it.applyTo) add('info', 'No applyTo: it will apply to all files (**).');
       if (it.type === 'mcp') {
-        if (it.transport === 'stdio' && !it.command) add('error', 'Servidor stdio sin comando.');
-        if (it.transport !== 'stdio' && !it.url) add('error', 'Servidor remoto sin URL.');
+        if (it.transport === 'stdio' && !it.command) add('error', 'stdio server without a command.');
+        if (it.transport !== 'stdio' && !it.url) add('error', 'Remote server without a URL.');
         Object.entries(Object.assign({}, it.env, it.headers)).forEach(([k, v]) => {
-          if (/(token|key|secret|password|pwd)/i.test(k) && v && !/\$\{/.test(String(v))) add('error', `«${k}» parece un secreto en claro. Usa \${input:${k}} o una variable de entorno.`);
+          if (/(token|key|secret|password|pwd)/i.test(k) && v && !/\$\{/.test(String(v))) add('error', `«${k}» looks like a plain-text secret. Use \${input:${k}} or an environment variable.`);
         });
       }
       if (it.type === 'workflow') issues.push(...validateWorkflow(lib, it));
@@ -1027,14 +1027,14 @@
   }
 
   /* ------------------------------------------------------------------ *
-   * Exportadores
+   * Exporters
    * ------------------------------------------------------------------ */
   const fmFile = (data, body) => {
     const clean = {};
     Object.keys(data).forEach((k) => { if (!isEmpty(data[k])) clean[k] = data[k]; });
     return stringifyFrontmatter(clean, body);
   };
-  const header = (what) => `<!-- Generado por AI Center ${VERSION} · ${what}. Edita el original en /library y vuelve a exportar. -->\n\n`;
+  const header = (what) => `<!-- Generated by AI Center ${VERSION} · ${what}. Edit the source in /library and export again. -->\n\n`;
   function pick(lib, opts) {
     opts = opts || {};
     let items = (lib.items || []).filter((i) => i.status !== 'deprecated');
@@ -1085,10 +1085,10 @@
     const skills = a.skills.map((id) => L.get('skill', id)).filter(Boolean);
     const know = a.knowledge.map((id) => L.get('knowledge', id)).filter(Boolean);
     const mcp = a.mcp.map((id) => L.get('mcp', id)).filter(Boolean);
-    if (skills.length) body += '\n\n## Skills\n\nCarga y aplica estas skills cuando sean relevantes:\n\n' + skills.map((s) => `- [${s.name}](${rel(selfPath, P.skill(s.id))}) — ${s.description}`).join('\n');
-    if (know.length) body += '\n\n## Conocimiento de referencia\n\nConsulta estos documentos antes de responder:\n\n' + know.map((k) => `- [${k.name}](${rel(selfPath, P.knowledge(k.id))}) — ${k.description}`).join('\n');
-    if (mcp.length) body += '\n\n## Herramientas MCP\n\n' + mcp.map((m) => `- **${m.name}** (\`${m.id}\`): ${m.description}`).join('\n');
-    if (a.handoffs.length) body += '\n\n## Traspasos\n\nCuando termines tu parte, propone continuar con:\n\n' + a.handoffs.map((h) => L.get('agent', h)).filter(Boolean).map((h) => `- **${h.name}** — ${h.description}`).join('\n');
+    if (skills.length) body += '\n\n## Skills\n\nLoad and apply these skills when relevant:\n\n' + skills.map((s) => `- [${s.name}](${rel(selfPath, P.skill(s.id))}) — ${s.description}`).join('\n');
+    if (know.length) body += '\n\n## Reference knowledge\n\nRead these documents before answering:\n\n' + know.map((k) => `- [${k.name}](${rel(selfPath, P.knowledge(k.id))}) — ${k.description}`).join('\n');
+    if (mcp.length) body += '\n\n## MCP tools\n\n' + mcp.map((m) => `- **${m.name}** (\`${m.id}\`): ${m.description}`).join('\n');
+    if (a.handoffs.length) body += '\n\n## Handoffs\n\nWhen you finish your part, suggest continuing with:\n\n' + a.handoffs.map((h) => L.get('agent', h)).filter(Boolean).map((h) => `- **${h.name}** — ${h.description}`).join('\n');
     return body;
   }
   function mcpServers(list, flavor) {
@@ -1131,7 +1131,7 @@
     (wf.edges || []).forEach((e) => lines.push(`  ${mid(e.from)} -->${e.label ? '|' + esc(e.label) + '|' : ''} ${mid(e.to)}`));
     return lines.join('\n');
   }
-  /** Runbook: el workflow como instrucciones ejecutables por un agente (E2E). */
+  /** Runbook: the workflow as instructions an agent can execute (E2E). */
   function workflowRunbook(lib, wf, flavor) {
     flavor = flavor || 'generic';
     const P = paths(flavor);
@@ -1141,72 +1141,71 @@
     const num = {}; order.forEach((n, i) => { num[n.id] = i + 1; });
     const { out } = wfMaps(wf);
     const nodesById = Object.fromEntries(order.map((n) => [n.id, n]));
-    const L = indexLib(lib);
     const runDir = `ai-runs/${wf.id}`;
     const L2 = [];
     L2.push(`# 🔀 Workflow: ${wf.name}`, '');
     if (wf.description) L2.push(`> ${wf.description.replace(/\n/g, '\n> ')}`, '');
     if (flavor === 'm365') {
-      L2.push('## Cómo ejecutarlo en Copilot M365', '',
-        'Copilot M365 no encadena agentes automáticamente: copia el prompt de cada paso en orden (o usa el **Ejecutor** de AI Center, que lo hace por ti y guarda el resultado). Pega en cada paso la salida del anterior donde se indica.', '');
+      L2.push('## How to run it in Copilot M365', '',
+        'Copilot M365 does not chain agents automatically: copy the prompt of each step in order (or use the AI Center **Runner**, which does it for you and saves the result). Paste the output of the previous step where indicated.', '');
     } else {
-      L2.push('## Instrucciones para el agente orquestador', '',
-        'Vas a ejecutar este workflow **de principio a fin (E2E)**. Reglas:', '',
-        '1. Crea una lista de tareas (todo list) con todos los pasos y ve marcándolos.',
-        '2. Ejecuta los pasos **en orden**, siguiendo las transiciones indicadas en «Siguiente».',
-        '3. En cada paso **adopta el rol del agente indicado**: lee su definición y aplica sus instrucciones, skills y conocimiento de referencia.',
-        `4. Guarda el entregable de cada paso en \`${runDir}/NN-<paso>.md\` y úsalo como contexto de los siguientes.`,
-        '5. En los pasos **🧑 Revisión humana**, DETENTE: muestra un resumen y espera aprobación explícita. Si piden cambios, vuelve al paso indicado incorporando el feedback.',
-        '6. En las **◆ Decisiones**, evalúa el criterio, elige una rama y explica por qué.',
-        `7. Al terminar, genera \`${runDir}/RESUMEN.md\` con entregables, decisiones, riesgos y próximos pasos.`,
-        '8. No inventes datos: si falta información imprescindible, pregúntala.', '');
+      L2.push('## Instructions for the orchestrator agent', '',
+        'You are going to run this workflow **end to end (E2E)**. Rules:', '',
+        '1. Create a task list (todo list) with all the steps and tick them off as you go.',
+        '2. Run the steps **in order**, following the transitions given in «Next».',
+        '3. In each step **adopt the role of the indicated agent**: read its definition and apply its instructions, skills and reference knowledge.',
+        `4. Save each step's deliverable in \`${runDir}/NN-<step>.md\` and use it as context for the next ones.`,
+        '5. At **🧑 Human review** steps, STOP: show a summary and wait for explicit approval. If changes are requested, go back to the indicated step incorporating the feedback.',
+        '6. At **◆ Decisions**, evaluate the criterion, choose a branch and explain why.',
+        `7. When finished, create \`${runDir}/SUMMARY.md\` with deliverables, decisions, risks and next steps.`,
+        '8. Do not make up data: if essential information is missing, ask for it.', '');
     }
     if ((wf.inputs || []).length) {
-      L2.push('## Entradas', '');
+      L2.push('## Inputs', '');
       wf.inputs.forEach((i) => {
         const v = flavor === 'copilot' ? '${input:' + i.name + ':' + (i.description || i.label || i.name).replace(/[{}:]/g, ' ') + '}'
-          : flavor === 'claude' ? (wf.inputs.length === 1 ? '$ARGUMENTS' : `(pídelo al usuario si no viene en $ARGUMENTS)`)
+          : flavor === 'claude' ? (wf.inputs.length === 1 ? '$ARGUMENTS' : '(ask the user if it is not in $ARGUMENTS)')
             : `[${(i.label || i.name).toUpperCase()}]`;
-        L2.push(`- **${i.label || i.name}**${i.required ? ' (obligatorio)' : ''}: ${v}${i.description && flavor !== 'copilot' ? ` — ${i.description}` : ''}`);
+        L2.push(`- **${i.label || i.name}**${i.required ? ' (required)' : ''}: ${v}${i.description && flavor !== 'copilot' ? ` — ${i.description}` : ''}`);
       });
       L2.push('');
     }
-    if (flavor !== 'm365') L2.push('## Mapa del flujo', '', '```mermaid', mermaid(lib, wf), '```', '');
-    L2.push('## Pasos', '');
+    if (flavor !== 'm365') L2.push('## Flow map', '', '```mermaid', mermaid(lib, wf), '```', '');
+    L2.push('## Steps', '');
     order.forEach((n) => {
       const r = resolveNode(lib, n);
       const t = n.title || nodeLabel(lib, n);
       const icon = (NODE_TYPES[n.type] || {}).icon || '';
-      L2.push(`### Paso ${num[n.id]} · ${icon} ${t}`, '');
-      const meta = [`- **Tipo**: ${(NODE_TYPES[n.type] || {}).label || n.type}`];
-      if (r.agent) meta.push(`- **Agente**: ${link(P.agent(r.agent.id), r.agent.name)}`);
+      L2.push(`### Step ${num[n.id]} · ${icon} ${t}`, '');
+      const meta = [`- **Type**: ${(NODE_TYPES[n.type] || {}).label || n.type}`];
+      if (r.agent) meta.push(`- **Agent**: ${link(P.agent(r.agent.id), r.agent.name)}`);
       if (r.skills.length) meta.push(`- **Skills**: ${r.skills.map((s) => link(P.skill(s.id), s.name)).join(', ')}`);
-      if (r.knowledge.length) meta.push(`- **Conocimiento**: ${r.knowledge.map((k) => link(P.knowledge(k.id), k.name)).join(', ')}`);
-      if (r.mcp.length) meta.push(`- **Herramientas**: ${r.mcp.map((m) => '`' + m.id + '`').join(', ')}`);
-      if (n.type !== 'start' && n.type !== 'end' && n.type !== 'human' && flavor !== 'm365') meta.push(`- **Guardar en**: \`${runDir}/${String(num[n.id]).padStart(2, '0')}-${slugify(t)}.md\``);
+      if (r.knowledge.length) meta.push(`- **Knowledge**: ${r.knowledge.map((k) => link(P.knowledge(k.id), k.name)).join(', ')}`);
+      if (r.mcp.length) meta.push(`- **Tools**: ${r.mcp.map((m) => '`' + m.id + '`').join(', ')}`);
+      if (n.type !== 'start' && n.type !== 'end' && n.type !== 'human' && flavor !== 'm365') meta.push(`- **Save to**: \`${runDir}/${String(num[n.id]).padStart(2, '0')}-${slugify(t)}.md\``);
       L2.push(meta.join('\n'), '');
-      if (n.type === 'start') L2.push('Recoge y confirma las entradas. Si falta alguna obligatoria, pídela antes de continuar.', '');
-      if (n.instructions) L2.push('**Instrucciones**', '', String(n.instructions).trim(), '');
-      if (n.type === 'condition' && n.question) L2.push(`**Criterio**: ${n.question}`, '');
-      if (n.type === 'human') L2.push(`**🧑 Punto de control**: ${n.instructions ? '' : 'Presenta los resultados anteriores y '}DETENTE hasta recibir aprobación explícita.`, '');
+      if (n.type === 'start') L2.push('Collect and confirm the inputs. If a required one is missing, ask for it before continuing.', '');
+      if (n.instructions) L2.push('**Instructions**', '', String(n.instructions).trim(), '');
+      if (n.type === 'condition' && n.question) L2.push(`**Criterion**: ${n.question}`, '');
+      if (n.type === 'human') L2.push(`**🧑 Checkpoint**: ${n.instructions ? '' : 'Present the previous results and '}STOP until you receive explicit approval.`, '');
       if (r.prompt) {
-        const body = convertVars(r.prompt.body, flavor === 'copilot' ? 'plain' : 'plain');
+        const body = convertVars(r.prompt.body, 'plain');
         L2.push(`**Prompt** (${flavor === 'm365' ? r.prompt.name : link(P.prompt(r.prompt.id), r.prompt.name)})`, '', '````markdown', body.trim(), '````', '');
       }
       if (flavor === 'm365' && n.type === 'step') {
         const c = composeStep(lib, wf, n, { inputs: {}, results: {} });
-        L2.push('<details><summary>Prompt completo para pegar en Copilot</summary>', '', '````markdown', convertVars(c.full, 'm365').replace(/«([^»]+)»/g, '[$1]'), '````', '', '</details>', '');
+        L2.push('<details><summary>Full prompt to paste into Copilot</summary>', '', '````markdown', convertVars(c.full, 'm365').replace(/«([^»]+)»/g, '[$1]'), '````', '', '</details>', '');
       }
-      if (n.deliverable) L2.push(`**Entregable**: ${n.deliverable}`, '');
+      if (n.deliverable) L2.push(`**Deliverable**: ${n.deliverable}`, '');
       const outs = (out[n.id] || []);
       if (outs.length) {
         const txt = outs.map((e) => {
           const tgt = nodesById[e.to];
-          const dest = tgt ? `Paso ${num[e.to]} (${tgt.title || nodeLabel(lib, tgt)})` : e.to;
-          return e.label ? `si «${e.label}» → ${dest}` : `→ ${dest}`;
+          const dest = tgt ? `Step ${num[e.to]} (${tgt.title || nodeLabel(lib, tgt)})` : e.to;
+          return e.label ? `if «${e.label}» → ${dest}` : `→ ${dest}`;
         });
-        L2.push(`**Siguiente**: ${txt.join(' · ')}`, '');
-      } else if (n.type === 'end') L2.push('**Fin del workflow.** Genera el resumen final.', '');
+        L2.push(`**Next**: ${txt.join(' · ')}`, '');
+      } else if (n.type === 'end') L2.push('**End of the workflow.** Produce the final summary.', '');
     });
     return L2.join('\n');
   }
@@ -1216,40 +1215,40 @@
     const g = by('instruction').filter((i) => i.global);
     const cfg = lib.config || DEFAULT_CONFIG;
     const L = [`# AGENTS.md · ${cfg.workspace}`, '',
-      '> Guía para agentes de IA (GitHub Copilot coding agent, Copilot CLI, Claude Code, Codex, Cursor…). Generado por AI Center: edita el original en `/library`.', ''];
-    if (g.length) { L.push('## Normas del equipo', ''); g.forEach((i) => L.push(`### ${i.name}`, '', i.body.trim(), '')); }
+      '> Guide for AI agents (GitHub Copilot coding agent, Copilot CLI, Claude Code, Codex, Cursor…). Generated by AI Center: edit the source in `/library`.', ''];
+    if (g.length) { L.push('## Team rules', ''); g.forEach((i) => L.push(`### ${i.name}`, '', i.body.trim(), '')); }
     const agents = by('agent');
     if (agents.length) {
-      L.push('## Agentes especializados', '', 'Adopta el rol adecuado según la tarea:', '', '| Agente | Cuándo usarlo | Definición |', '|---|---|---|');
+      L.push('## Specialized agents', '', 'Adopt the right role for the task:', '', '| Agent | When to use it | Definition |', '|---|---|---|');
       agents.forEach((a) => L.push(`| ${a.icon || '🤖'} ${a.name} | ${a.description.replace(/\|/g, '/').replace(/\n/g, ' ')} | [\`${P.agent(a.id)}\`](${P.agent(a.id)}) |`));
       L.push('');
     }
     const wfs = by('workflow');
     if (wfs.length) {
-      L.push('## Workflows ejecutables E2E', '', 'Cuando te pidan ejecutar un workflow, abre su runbook y síguelo paso a paso (incluidas las paradas de revisión humana):', '');
+      L.push('## E2E executable workflows', '', 'When asked to run a workflow, open its runbook and follow it step by step (including the human review stops):', '');
       wfs.forEach((w) => L.push(`- **${w.name}** — ${w.description.replace(/\n/g, ' ')} → [\`${P.workflow(w.id)}\`](${P.workflow(w.id)})`));
       L.push('');
     }
     const sk = by('skill');
     if (sk.length) { L.push('## Skills', ''); sk.forEach((s) => L.push(`- **${s.name}** — ${s.description} → [\`${P.skill(s.id)}\`](${P.skill(s.id)})`)); L.push(''); }
     const kn = by('knowledge');
-    if (kn.length) { L.push('## Conocimiento de referencia', ''); kn.forEach((k) => L.push(`- [${k.name}](${P.knowledge(k.id)}) — ${k.description}`)); L.push(''); }
+    if (kn.length) { L.push('## Reference knowledge', ''); kn.forEach((k) => L.push(`- [${k.name}](${P.knowledge(k.id)}) — ${k.description}`)); L.push(''); }
     const pr = by('prompt');
-    if (pr.length) { L.push('## Prompts reutilizables', ''); pr.forEach((p) => L.push(`- **${p.name}** — ${p.description} → \`${P.prompt(p.id)}\``)); L.push(''); }
+    if (pr.length) { L.push('## Reusable prompts', ''); pr.forEach((p) => L.push(`- **${p.name}** — ${p.description} → \`${P.prompt(p.id)}\``)); L.push(''); }
     const sc = by('instruction').filter((i) => !i.global);
-    if (sc.length) { L.push('## Instrucciones por tipo de fichero', ''); sc.forEach((i) => L.push(`- \`${i.applyTo || '**'}\` → **${i.name}**: ${i.description}`)); L.push(''); }
+    if (sc.length) { L.push('## Instructions per file type', ''); sc.forEach((i) => L.push(`- \`${i.applyTo || '**'}\` → **${i.name}**: ${i.description}`)); L.push(''); }
     return L.join('\n');
   }
   function m365Instructions(lib, a) {
     const L = indexLib(lib);
-    let txt = a.body.trim();
+    const txt = a.body.trim();
     const skills = a.skills.map((id) => L.get('skill', id)).filter(Boolean);
     const know = a.knowledge.map((id) => L.get('knowledge', id)).filter(Boolean);
     const globals = (lib.items || []).filter((i) => i.type === 'instruction' && i.global && (!i.targets.length || i.targets.includes('m365') || i.targets.includes('any')));
     let extra = '';
-    if (skills.length) extra += '\n\n# Procedimientos\n\n' + skills.map((s) => `## ${s.name}\n${s.body.trim()}`).join('\n\n');
-    if (know.length) extra += '\n\n# Contexto\n\n' + know.map((k) => `## ${k.name}\n${k.body.trim()}`).join('\n\n');
-    if (globals.length) extra += '\n\n# Normas\n\n' + globals.map((g) => g.body.trim()).join('\n\n');
+    if (skills.length) extra += '\n\n# Procedures\n\n' + skills.map((s) => `## ${s.name}\n${s.body.trim()}`).join('\n\n');
+    if (know.length) extra += '\n\n# Context\n\n' + know.map((k) => `## ${k.name}\n${k.body.trim()}`).join('\n\n');
+    if (globals.length) extra += '\n\n# Rules\n\n' + globals.map((g) => g.body.trim()).join('\n\n');
     return (txt + extra).replace(/\n{3,}/g, '\n\n');
   }
   function m365Fit(lib, a) {
@@ -1258,7 +1257,7 @@
     const L = indexLib(lib);
     let short = a.body.trim();
     const skills = a.skills.map((id) => L.get('skill', id)).filter(Boolean);
-    if (skills.length) short += '\n\n# Procedimientos disponibles\n' + skills.map((s) => `- ${s.name}: ${s.description}`).join('\n');
+    if (skills.length) short += '\n\n# Available procedures\n' + skills.map((s) => `- ${s.name}: ${s.description}`).join('\n');
     return short.length > 8000 ? short.slice(0, 7950) + '\n…' : short;
   }
   function trunc(s, n) { s = String(s || ''); return s.length > n ? s.slice(0, n - 1) + '…' : s; }
@@ -1269,13 +1268,13 @@
     const files = [];
     const add = (path, content) => files.push({ path, content });
     const globals = by('instruction').filter((i) => i.global);
-    let ci = header('GitHub Copilot · instrucciones del repositorio') + `# Instrucciones del equipo para GitHub Copilot\n\n`;
-    ci += globals.length ? globals.map((g) => `## ${g.name}\n\n${g.body.trim()}`).join('\n\n') : '_Sin instrucciones globales._';
+    let ci = header('GitHub Copilot · repository instructions') + `# Team instructions for GitHub Copilot\n\n`;
+    ci += globals.length ? globals.map((g) => `## ${g.name}\n\n${g.body.trim()}`).join('\n\n') : '_No global instructions._';
     const ag = by('agent'); const wf = by('workflow');
     if (ag.length || wf.length) {
-      ci += '\n\n## Recursos de IA disponibles\n\n';
-      if (ag.length) ci += '**Custom agents** (selector de agentes del chat):\n' + ag.map((a) => `- \`${a.id}\` — ${a.name}: ${a.description}`).join('\n') + '\n\n';
-      if (wf.length) ci += '**Workflows E2E** (escribe `/wf-<id>` en el chat):\n' + wf.map((w) => `- \`/wf-${w.id}\` — ${w.name}`).join('\n') + '\n';
+      ci += '\n\n## Available AI resources\n\n';
+      if (ag.length) ci += '**Custom agents** (chat agent picker):\n' + ag.map((a) => `- \`${a.id}\` — ${a.name}: ${a.description}`).join('\n') + '\n\n';
+      if (wf.length) ci += '**E2E workflows** (type `/wf-<id>` in the chat):\n' + wf.map((w) => `- \`/wf-${w.id}\` — ${w.name}`).join('\n') + '\n';
     }
     add('.github/copilot-instructions.md', ci + '\n');
     by('instruction').filter((i) => !i.global).forEach((i) => add(`.github/instructions/${i.id}.instructions.md`, fmFile({ description: i.description, applyTo: i.applyTo || '**' }, i.body)));
@@ -1286,7 +1285,7 @@
     ag.forEach((a) => {
       const path = P.agent(a.id);
       const tools = uniq([...a.tools, ...a.mcp.filter((m) => L.get('mcp', m)).map((m) => `${m}/*`)]);
-      const handoffs = a.handoffs.map((h) => L.get('agent', h)).filter(Boolean).map((h) => ({ label: `Continuar con ${h.name}`, agent: h.id, prompt: `Continúa a partir del trabajo anterior en tu rol de ${h.name}.`, send: false }));
+      const handoffs = a.handoffs.map((h) => L.get('agent', h)).filter(Boolean).map((h) => ({ label: `Continue with ${h.name}`, agent: h.id, prompt: `Continue from the previous work in your role as ${h.name}.`, send: false }));
       add(path, fmFile({ name: a.name, description: a.description, tools, model: a.model, handoffs }, agentBodyFor(lib, a, 'copilot', path)));
     });
     by('skill').forEach((s) => {
@@ -1297,19 +1296,19 @@
     const mcps = by('mcp');
     if (mcps.length) add('.vscode/mcp.json', JSON.stringify(mcpServers(mcps, 'copilot'), null, 2) + '\n');
     wf.forEach((w) => {
-      add(P.workflow(w.id), fmFile({ description: `Workflow E2E: ${w.name}`, agent: 'agent' }, workflowRunbook(lib, w, 'copilot')));
+      add(P.workflow(w.id), fmFile({ description: `E2E workflow: ${w.name}`, agent: 'agent' }, workflowRunbook(lib, w, 'copilot')));
       add(`docs/ai/workflows/${w.id}.workflow.json`, itemToFile(w).content);
     });
     add('AGENTS.md', agentsMd(lib, 'copilot', opts));
     return files;
   }
   function exportClaude(lib, opts) {
-    const { by, L } = pick(lib, opts);
+    const { by } = pick(lib, opts);
     const P = paths('claude');
     const files = [];
     const add = (path, content) => files.push({ path, content });
     const globals = by('instruction').filter((i) => i.global);
-    add('CLAUDE.md', `# Instrucciones del proyecto\n\n${globals.map((g) => `## ${g.name}\n\n${g.body.trim()}`).join('\n\n')}\n\n## Agentes, skills y workflows\n\n@AGENTS.md\n`);
+    add('CLAUDE.md', `# Project instructions\n\n${globals.map((g) => `## ${g.name}\n\n${g.body.trim()}`).join('\n\n')}\n\n## Agents, skills and workflows\n\n@AGENTS.md\n`);
     by('instruction').filter((i) => !i.global).forEach((i) => add(`.claude/rules/${i.id}.md`, fmFile({ description: i.description, paths: i.applyTo ? arr(i.applyTo) : undefined }, i.body)));
     by('agent').forEach((a) => {
       const path = P.agent(a.id);
@@ -1328,9 +1327,8 @@
     by('knowledge').forEach((k) => add(P.knowledge(k.id), `# ${k.name}\n\n${k.description ? '> ' + k.description + '\n\n' : ''}${k.body.trim()}\n`));
     const mcps = by('mcp');
     if (mcps.length) add('.mcp.json', JSON.stringify(mcpServers(mcps, 'claude'), null, 2) + '\n');
-    by('workflow').forEach((w) => add(P.workflow(w.id), fmFile({ description: `Workflow E2E: ${w.name}`, 'argument-hint': (w.inputs || []).map((i) => `[${i.name}]`).join(' ') || undefined }, workflowRunbook(lib, w, 'claude'))));
+    by('workflow').forEach((w) => add(P.workflow(w.id), fmFile({ description: `E2E workflow: ${w.name}`, 'argument-hint': (w.inputs || []).map((i) => `[${i.name}]`).join(' ') || undefined }, workflowRunbook(lib, w, 'claude'))));
     add('AGENTS.md', agentsMd(lib, 'claude', opts));
-    void L;
     return files;
   }
   function exportCursor(lib, opts) {
@@ -1339,7 +1337,7 @@
     const files = [];
     const add = (path, content) => files.push({ path, content });
     by('instruction').forEach((i) => add(`.cursor/rules/${i.id}.mdc`, fmFile({ description: i.description, globs: i.global ? undefined : (i.applyTo || '**'), alwaysApply: i.global ? true : false }, i.body)));
-    by('agent').forEach((a) => { const path = P.agent(a.id); add(path, fmFile({ description: `Rol ${a.name}: ${a.description}`, alwaysApply: false }, `# ${a.name}\n\n${agentBodyFor(lib, a, 'cursor', path)}`)); });
+    by('agent').forEach((a) => { const path = P.agent(a.id); add(path, fmFile({ description: `${a.name} role: ${a.description}`, alwaysApply: false }, `# ${a.name}\n\n${agentBodyFor(lib, a, 'cursor', path)}`)); });
     by('skill').forEach((s) => add(P.skill(s.id), fmFile({ description: s.description, alwaysApply: false }, s.body)));
     by('prompt').forEach((p) => add(P.prompt(p.id), convertVars(p.body, 'plain')));
     by('knowledge').forEach((k) => add(P.knowledge(k.id), `# ${k.name}\n\n${k.body.trim()}\n`));
@@ -1393,20 +1391,20 @@
   function agentBuilderGuide(lib, a) {
     const pkg = m365Package(lib, a);
     return [`# ${a.icon || '🤖'} ${a.name} · Copilot M365 Agent Builder`, '',
-      '## Opción A · Sin código (Agent Builder en Microsoft 365 Copilot)', '',
-      '1. Abre **Microsoft 365 Copilot** → **Agentes** → **Crear agente** → pestaña **Configurar**.',
-      '2. Copia cada campo de abajo en su sitio.',
-      '3. En **Conocimiento** añade los sitios de SharePoint/OneDrive indicados y activa las capacidades.',
-      '4. Prueba en el panel derecho y pulsa **Crear**. Compártelo con tu equipo.', '',
-      '### Nombre', '', '```text', a.name, '```', '',
-      '### Descripción', '', '```text', a.description, '```', '',
-      '### Instrucciones', '', '```text', pkg.declarativeAgent.instructions, '```', '',
-      '### Conversation starters', '', ...(a.starters.length ? a.starters.map((s) => `- ${s}`) : ['_(ninguno)_']), '',
-      '### Conocimiento y capacidades', '', ...(a.sharepointUrls.map((u) => `- 📁 ${u}`)), ...(a.capabilities.map((c) => `- ✅ ${c}`)), (a.sharepointUrls.length || a.capabilities.length) ? '' : '_(ninguno)_', '',
-      '## Opción B · Paquete (Microsoft 365 Agents Toolkit / subida de app)', '',
-      '- La carpeta `appPackage/` contiene `manifest.json`, `declarativeAgent.json` e iconos.',
-      '- Comprímela (los ficheros en la raíz del zip) y súbela en Teams → **Aplicaciones** → **Administrar aplicaciones** → **Cargar una aplicación personalizada**, o ábrela con **Agents Toolkit** en VS Code para validar y provisionar.',
-      '- Revisa `developer.*Url` en el manifest antes de publicar a toda la organización.', ''].join('\n');
+      '## Option A · No code (Agent Builder in Microsoft 365 Copilot)', '',
+      '1. Open **Microsoft 365 Copilot** → **Agents** → **Create agent** → **Configure** tab.',
+      '2. Copy each field below into its place.',
+      '3. Under **Knowledge** add the SharePoint/OneDrive sites listed and enable the capabilities.',
+      '4. Test it in the right-hand panel and click **Create**. Share it with your team.', '',
+      '### Name', '', '```text', a.name, '```', '',
+      '### Description', '', '```text', a.description, '```', '',
+      '### Instructions', '', '```text', pkg.declarativeAgent.instructions, '```', '',
+      '### Conversation starters', '', ...(a.starters.length ? a.starters.map((s) => `- ${s}`) : ['_(none)_']), '',
+      '### Knowledge and capabilities', '', ...(a.sharepointUrls.map((u) => `- 📁 ${u}`)), ...(a.capabilities.map((c) => `- ✅ ${c}`)), (a.sharepointUrls.length || a.capabilities.length) ? '' : '_(none)_', '',
+      '## Option B · Package (Microsoft 365 Agents Toolkit / app upload)', '',
+      '- The `appPackage/` folder contains `manifest.json`, `declarativeAgent.json` and the icons.',
+      '- Zip it (files at the root of the zip) and upload it in Teams → **Apps** → **Manage your apps** → **Upload a custom app**, or open it with **Agents Toolkit** in VS Code to validate and provision it.',
+      '- Review `developer.*Url` in the manifest before publishing to the whole organization.', ''].join('\n');
   }
   function exportM365(lib, opts) {
     opts = opts || {};
@@ -1424,16 +1422,16 @@
     });
     const prompts = by('prompt');
     if (prompts.length) {
-      const L = ['# 💬 Prompts para Copilot M365', '', '> Copia el prompt, sustituye los [CORCHETES] y pégalo en Copilot (Chat, Word, Outlook, Teams…). Consejo: guárdalos en tu galería de prompts de Copilot.', ''];
+      const L = ['# 💬 Prompts for Copilot M365', '', '> Copy the prompt, replace the [BRACKETS] and paste it into Copilot (Chat, Word, Outlook, Teams…). Tip: save them in your Copilot prompt gallery.', ''];
       prompts.forEach((p) => L.push(`## ${p.icon || '💬'} ${p.name}`, '', `_${p.description}_`, '', '```text', convertVars(p.body, 'm365').trim(), '```', ''));
       add('m365/PROMPTS.md', L.join('\n'));
     }
     by('workflow').forEach((w) => add(`m365/workflows/${w.id}.md`, workflowRunbook(lib, w, 'm365')));
-    add('m365/README.md', ['# Copilot M365 · Paquete generado por AI Center', '',
-      '- `agents/<id>/AGENT-BUILDER.md` → crea el agente sin código copiando y pegando.',
-      '- `agents/<id>/appPackage/` → paquete de agente declarativo (manifest 1.19 + declarative agent v1.5) para Agents Toolkit o carga de app personalizada.',
-      '- `PROMPTS.md` → prompts listos para Copilot Chat, Word, Outlook, Teams.',
-      '- `workflows/` → flujos paso a paso. Para ejecutarlos guiado, usa el Ejecutor de AI Center en modo manual.', ''].join('\n'));
+    add('m365/README.md', ['# Copilot M365 · Package generated by AI Center', '',
+      '- `agents/<id>/AGENT-BUILDER.md` → create the agent without code by copy and paste.',
+      '- `agents/<id>/appPackage/` → declarative agent package (manifest 1.19 + declarative agent v1.5) for Agents Toolkit or custom app upload.',
+      '- `PROMPTS.md` → prompts ready for Copilot Chat, Word, Outlook, Teams.',
+      '- `workflows/` → step-by-step flows. To run them guided, use the AI Center Runner in manual mode.', ''].join('\n'));
     return files;
   }
   function exportGeneric(lib, opts) {
@@ -1450,18 +1448,17 @@
     return files;
   }
   const EXPORTERS = {
-    copilot: { label: 'GitHub Copilot', desc: '.github/ (instructions, prompts, agents, skills), .vscode/mcp.json, AGENTS.md y workflows como /wf-*', fn: exportCopilot },
-    m365: { label: 'Copilot M365', desc: 'Agentes declarativos (manifest + declarativeAgent.json + iconos), guía para Agent Builder, prompts y workflows guiados', fn: exportM365 },
+    copilot: { label: 'GitHub Copilot', desc: '.github/ (instructions, prompts, agents, skills), .vscode/mcp.json, AGENTS.md and workflows as /wf-*', fn: exportCopilot },
+    m365: { label: 'Copilot M365', desc: 'Declarative agents (manifest + declarativeAgent.json + icons), Agent Builder guide, prompts and guided workflows', fn: exportM365 },
     claude: { label: 'Claude Code', desc: 'CLAUDE.md, .claude/agents, .claude/commands, .claude/skills, .mcp.json', fn: exportClaude },
     cursor: { label: 'Cursor', desc: '.cursor/rules/*.mdc, .cursor/commands, .cursor/mcp.json', fn: exportCursor },
-    generic: { label: 'Cualquier IA', desc: 'ai/ con prompts y system prompts en texto plano, runbooks y AGENTS.md', fn: exportGeneric }
+    generic: { label: 'Any AI', desc: 'ai/ with plain-text prompts and system prompts, runbooks and AGENTS.md', fn: exportGeneric }
   };
   function exportTargets(lib, targets, opts) {
     const seen = new Map();
     (targets || []).forEach((t) => {
       if (!EXPORTERS[t]) return;
       EXPORTERS[t].fn(lib, opts).forEach((f) => {
-        if (seen.has(f.path) && f.path === 'AGENTS.md') return;
         if (!seen.has(f.path)) seen.set(f.path, f);
       });
     });

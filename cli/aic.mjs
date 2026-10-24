@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
- * AI Center · CLI (Node 18+, sin dependencias)
- * Usa el mismo núcleo que la app (assets/js/core.js).
+ * AI Center · CLI (Node 18+, no dependencies)
+ * Uses the same core as the app (assets/js/core.js).
  *
  *   node cli/aic.mjs help
  */
@@ -17,7 +17,7 @@ const require = createRequire(import.meta.url);
 const C = require('../assets/js/core.js');
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
-/* ---------------- argumentos ---------------- */
+/* ---------------- arguments ---------------- */
 const argv = process.argv.slice(2);
 const flags = { input: [] };
 const pos = [];
@@ -38,7 +38,7 @@ const c = {
 };
 const die = (msg) => { console.error(c.r('✖ ' + msg)); process.exit(1); };
 
-/* ---------------- ficheros ---------------- */
+/* ---------------- files ---------------- */
 function readTree(dir, prefix = '') {
   const out = [];
   if (!fs.existsSync(dir)) return out;
@@ -58,7 +58,7 @@ function writeOut(base, rel, data) {
   fs.writeFileSync(full, data);
 }
 
-/* ---------------- PNG mínimo para iconos M365 ---------------- */
+/* ---------------- minimal PNG for M365 icons ---------------- */
 const CRC = (() => { const t = []; for (let n = 0; n < 256; n++) { let x = n; for (let k = 0; k < 8; k++) x = x & 1 ? 0xEDB88320 ^ (x >>> 1) : x >>> 1; t[n] = x >>> 0; } return t; })();
 const crc32 = (buf) => { let x = 0xFFFFFFFF; for (const b of buf) x = CRC[(x ^ b) & 0xFF] ^ (x >>> 8); return (x ^ 0xFFFFFFFF) >>> 0; };
 function png(size, pixel) {
@@ -80,7 +80,7 @@ function iconPng(ic) {
   return png(s, (x, y) => { const t = (x + y) / (2 * s); return [...a.map((v, i) => Math.round(v + (b[i] - v) * t)), 255]; });
 }
 
-/* ---------------- interacción ---------------- */
+/* ---------------- interaction ---------------- */
 let rl = null;
 const lineQueue = []; const waiters = []; let stdinClosed = false;
 function ensureRl() {
@@ -91,40 +91,40 @@ function ensureRl() {
 }
 const ask = (q) => { ensureRl(); if (q) process.stdout.write(q); if (lineQueue.length) return Promise.resolve(lineQueue.shift()); if (stdinClosed) return Promise.resolve(''); return new Promise((res) => waiters.push(res)); };
 async function readMultiline(prompt) {
-  console.log(prompt + c.dim(' (termina con una línea que contenga solo EOF)'));
+  console.log(prompt + c.dim(' (finish with a line containing only EOF)'));
   const lines = [];
   for (;;) { const l = await ask(''); if (l.trim() === 'EOF' || (stdinClosed && !lineQueue.length && l === '')) break; lines.push(l); }
   return lines.join('\n');
 }
 
-/* ---------------- proveedores LLM ---------------- */
+/* ---------------- LLM providers ---------------- */
 function runProc(bin, args, opts) {
   return new Promise((resolve, reject) => {
     const p = spawn(bin, args, Object.assign({ stdio: ['ignore', 'pipe', 'pipe'] }, opts));
     let out = ''; let err = '';
     p.stdout.on('data', (d) => { out += d; if (flags.verbose) process.stdout.write(c.dim(String(d))); });
     p.stderr.on('data', (d) => { err += d; });
-    p.on('error', (e) => reject(e.code === 'ENOENT' ? new Error(`No se encuentra «${bin}» en el PATH`) : e));
-    p.on('close', (code) => code === 0 ? resolve(out.trim()) : reject(new Error(`${bin} terminó con código ${code}: ${err.slice(-600)}`)));
+    p.on('error', (e) => reject(e.code === 'ENOENT' ? new Error(`«${bin}» not found in PATH`) : e));
+    p.on('close', (code) => code === 0 ? resolve(out.trim()) : reject(new Error(`${bin} exited with code ${code}: ${err.slice(-600)}`)));
   });
 }
-const AGENTIC_NOTE = '\n\n---\nTrabajas dentro del repositorio actual y puedes usar tus herramientas (leer/editar ficheros, ejecutar comandos). Cuando termines este paso, responde con el entregable completo del paso en Markdown.';
+const AGENTIC_NOTE = '\n\n---\nYou are working inside the current repository and can use your tools (read/edit files, run commands). When you finish this step, answer with the complete step deliverable in Markdown.';
 function makeLLM(provider, runDir) {
   const model = flags.model;
   return async (composed, info) => {
     const tag = String(info.run.steps.length).padStart(2, '0');
     fs.writeFileSync(path.join(runDir, `${tag}-${C.slugify(composed.title)}.prompt.md`), composed.full);
-    console.log(`\n${c.m('◆')} ${c.b(composed.title)} ${c.dim('· ' + provider + (composed.agent ? ' · agente ' + composed.agent : ''))}`);
+    console.log(`\n${c.m('◆')} ${c.b(composed.title)} ${c.dim('· ' + provider + (composed.agent ? ' · agent ' + composed.agent : ''))}`);
     switch (provider) {
       case 'manual': {
         console.log(c.dim('─'.repeat(60)));
         console.log(composed.full);
         console.log(c.dim('─'.repeat(60)));
-        if (info.kind === 'condition') console.log(c.y('Opciones: ' + info.options.join(' · ')));
-        return readMultiline(c.cy('Pega la respuesta de tu IA:'));
+        if (info.kind === 'condition') console.log(c.y('Options: ' + info.options.join(' · ')));
+        return readMultiline(c.cy('Paste your AI answer:'));
       }
       case 'anthropic': {
-        const key = process.env.ANTHROPIC_API_KEY || die('Falta ANTHROPIC_API_KEY');
+        const key = process.env.ANTHROPIC_API_KEY || die('Missing ANTHROPIC_API_KEY');
         const r = await fetch('https://api.anthropic.com/v1/messages', { method: 'POST', headers: { 'content-type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01' },
           body: JSON.stringify({ model: model || process.env.ANTHROPIC_MODEL || 'claude-sonnet-5-5', max_tokens: 8000, system: composed.system, messages: [{ role: 'user', content: composed.user }] }) });
         const d = await r.json();
@@ -134,14 +134,14 @@ function makeLLM(provider, runDir) {
       case 'openai': case 'github': case 'ollama': case 'azure': {
         let url; const headers = { 'content-type': 'application/json' }; const body = { messages: [{ role: 'system', content: composed.system }, { role: 'user', content: composed.user }] };
         if (provider === 'azure') {
-          const ep = process.env.AZURE_OPENAI_ENDPOINT || die('Falta AZURE_OPENAI_ENDPOINT');
-          const dep = model || process.env.AZURE_OPENAI_DEPLOYMENT || die('Indica --model <deployment> o AZURE_OPENAI_DEPLOYMENT');
+          const ep = process.env.AZURE_OPENAI_ENDPOINT || die('Missing AZURE_OPENAI_ENDPOINT');
+          const dep = model || process.env.AZURE_OPENAI_DEPLOYMENT || die('Pass --model <deployment> or set AZURE_OPENAI_DEPLOYMENT');
           url = `${ep.replace(/\/$/, '')}/openai/deployments/${dep}/chat/completions?api-version=${process.env.AZURE_OPENAI_API_VERSION || '2024-10-21'}`;
-          headers['api-key'] = process.env.AZURE_OPENAI_API_KEY || die('Falta AZURE_OPENAI_API_KEY');
+          headers['api-key'] = process.env.AZURE_OPENAI_API_KEY || die('Missing AZURE_OPENAI_API_KEY');
         } else {
           const base = provider === 'github' ? 'https://models.github.ai/inference' : provider === 'ollama' ? (process.env.OLLAMA_BASE_URL || 'http://localhost:11434/v1') : (process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1');
           url = base.replace(/\/$/, '') + '/chat/completions';
-          const key = provider === 'github' ? (process.env.GITHUB_TOKEN || die('Falta GITHUB_TOKEN (con permiso models:read)')) : provider === 'openai' ? (process.env.OPENAI_API_KEY || '') : '';
+          const key = provider === 'github' ? (process.env.GITHUB_TOKEN || die('Missing GITHUB_TOKEN (with models:read permission)')) : provider === 'openai' ? (process.env.OPENAI_API_KEY || '') : '';
           if (key) headers.Authorization = 'Bearer ' + key;
           body.model = model || (provider === 'github' ? 'openai/gpt-4.1' : provider === 'ollama' ? 'llama3.1' : (process.env.OPENAI_MODEL || 'gpt-4.1'));
         }
@@ -162,38 +162,38 @@ function makeLLM(provider, runDir) {
         if (model) args.push('--model', model);
         return runProc(process.env.AIC_CLAUDE_BIN || 'claude', args, { cwd: flags.cwd ? path.resolve(flags.cwd) : process.cwd() });
       }
-      default: die('Proveedor desconocido: ' + provider + ' (manual|anthropic|openai|github|azure|ollama|copilot|claude-code)');
+      default: die('Unknown provider: ' + provider + ' (manual|anthropic|openai|github|azure|ollama|copilot|claude-code)');
     }
   };
 }
 
-/* ---------------- comandos ---------------- */
+/* ---------------- commands ---------------- */
 const HELP = `
 ${c.b('AI Center · CLI')}  ${c.dim('v' + C.VERSION)}
 
-${c.b('Uso')}  node cli/aic.mjs <comando> [opciones]
+${c.b('Usage')}  node cli/aic.mjs <command> [options]
 
-  ${c.cy('list')} [tipo]                      Lista la librería (workflow, agent, prompt, skill, instruction, knowledge, mcp)
-  ${c.cy('lint')}                             Valida la librería (código de salida 1 si hay errores)
-  ${c.cy('bundle')}                           Regenera library/library.bundle.js (para abrir index.html sin servidor)
-  ${c.cy('export')} <destino...|all> [--out dir] [--tag t]
-                                   Destinos: copilot · m365 · claude · cursor · generic
+  ${c.cy('list')} [type]                      List the library (workflow, agent, prompt, skill, instruction, knowledge, mcp)
+  ${c.cy('lint')}                             Validate the library (exit code 1 on errors)
+  ${c.cy('bundle')}                           Regenerate library/library.bundle.js (to open index.html without a server)
+  ${c.cy('export')} <target...|all> [--out dir] [--tag t]
+                                   Targets: copilot · m365 · claude · cursor · generic
   ${c.cy('runbook')} <workflow> [--flavor copilot|claude|m365|generic]
-                                   Imprime el runbook E2E de un workflow
-  ${c.cy('run')} <workflow> [--input clave=valor ...] [--provider p] [--model m] [--auto-approve] [--cwd dir]
-                                   Ejecuta un workflow de principio a fin
-                                   Proveedores: manual (defecto) · copilot (Copilot CLI) · claude-code · anthropic
-                                                github (GitHub Models) · openai · azure · ollama
-  ${c.cy('new')} <tipo> "<nombre>"             Crea un elemento desde plantilla
-  ${c.cy('agents-md')}                        Regenera AGENTS.md del framework (para agentes que trabajen en este repo)
+                                   Print the E2E runbook of a workflow
+  ${c.cy('run')} <workflow> [--input key=value ...] [--provider p] [--model m] [--auto-approve] [--cwd dir]
+                                   Run a workflow end to end
+                                   Providers: manual (default) · copilot (Copilot CLI) · claude-code · anthropic
+                                              github (GitHub Models) · openai · azure · ollama
+  ${c.cy('new')} <type> "<name>"               Create an item from a template
+  ${c.cy('agents-md')}                        Regenerate the framework AGENTS.md (for agents working in this repo)
 
-${c.b('Opciones globales')}
-  --lib <dir>    Carpeta de la librería (por defecto ./library)
-  --verbose      Muestra la salida de los agentes en tiempo real
+${c.b('Global options')}
+  --lib <dir>    Library folder (default ./library)
+  --verbose      Show agent output in real time
 
-${c.b('Ejemplos')}
-  node cli/aic.mjs export copilot --out ../mi-repo
-  node cli/aic.mjs run feature-e2e --input idea="Exportar facturas a PDF" --provider copilot --cwd ../mi-repo
+${c.b('Examples')}
+  node cli/aic.mjs export copilot --out ../my-repo
+  node cli/aic.mjs run feature-e2e --input idea="Export invoices to PDF" --provider copilot --cwd ../my-repo
   GITHUB_TOKEN=… node cli/aic.mjs run bugfix --provider github --auto-approve
 `;
 
@@ -220,7 +220,7 @@ async function main() {
       const col = { error: c.r, warn: c.y, info: c.cy };
       issues.forEach((i) => console.log(`${col[i.level]((i.level.toUpperCase()).padEnd(6))} ${c.b(i.type + ':' + i.id)} ${i.msg}`));
       const e = issues.filter((i) => i.level === 'error').length;
-      console.log(`\n${lib.items.length} elementos · ${e ? c.r(e + ' errores') : c.g('0 errores')} · ${issues.filter((i) => i.level === 'warn').length} avisos · ${issues.filter((i) => i.level === 'info').length} sugerencias`);
+      console.log(`\n${lib.items.length} items · ${e ? c.r(e + ' errors') : c.g('0 errors')} · ${issues.filter((i) => i.level === 'warn').length} warnings · ${issues.filter((i) => i.level === 'info').length} suggestions`);
       process.exit(e ? 1 : 0);
       break;
     }
@@ -228,7 +228,7 @@ async function main() {
     case 'bundle': {
       const lib = loadLib();
       fs.writeFileSync(path.join(LIB_DIR, 'library.bundle.js'), C.serializeBundle(lib));
-      console.log(c.g('✔') + ` library.bundle.js regenerado (${lib.items.length} elementos)`);
+      console.log(c.g('✔') + ` library.bundle.js regenerated (${lib.items.length} items)`);
       break;
     }
 
@@ -239,22 +239,22 @@ async function main() {
       const out = path.resolve(flags.out || path.join(ROOT, 'dist'));
       const files = C.exportTargets(lib, targets, { tag: flags.tag });
       files.forEach((f) => writeOut(out, f.path, f.icon ? iconPng(f.icon) : f.content));
-      console.log(c.g('✔') + ` ${files.length} ficheros (${targets.join(', ')}) → ${out}`);
+      console.log(c.g('✔') + ` ${files.length} files (${targets.join(', ')}) → ${out}`);
       break;
     }
 
     case 'runbook': {
       const lib = loadLib();
-      const wf = lib.items.find((i) => i.type === 'workflow' && i.id === pos[0]) || die('Workflow no encontrado: ' + pos[0]);
+      const wf = lib.items.find((i) => i.type === 'workflow' && i.id === pos[0]) || die('Workflow not found: ' + pos[0]);
       console.log(C.workflowRunbook(lib, wf, flags.flavor || 'generic'));
       break;
     }
 
     case 'run': {
       const lib = loadLib();
-      const wf = lib.items.find((i) => i.type === 'workflow' && i.id === pos[0]) || die('Workflow no encontrado: ' + (pos[0] || '(indica un id)') + '. Usa: node cli/aic.mjs list workflow');
+      const wf = lib.items.find((i) => i.type === 'workflow' && i.id === pos[0]) || die('Workflow not found: ' + (pos[0] || '(give an id)') + '. Use: node cli/aic.mjs list workflow');
       const errors = C.validateWorkflow(lib, wf).filter((i) => i.level === 'error');
-      if (errors.length) die('El workflow tiene errores:\n  ' + errors.map((e) => e.msg).join('\n  '));
+      if (errors.length) die('The workflow has errors:\n  ' + errors.map((e) => e.msg).join('\n  '));
       const inputs = {};
       flags.input.forEach((kv) => { const [k, v] = String(kv).split(/=(.*)/s); inputs[k] = v; });
       for (const i of wf.inputs) if (!inputs[i.name] && i.required) inputs[i.name] = await ask(`${c.cy('?')} ${i.label || i.name}${i.description ? c.dim(' (' + i.description + ')') : ''}: `);
@@ -263,29 +263,29 @@ async function main() {
       const stamp = new Date().toISOString().replace(/[:.]/g, '-');
       const runDir = path.join(runsDir, `${stamp}-${wf.id}`);
       fs.mkdirSync(runDir, { recursive: true });
-      console.log(`\n${c.b('▶ ' + wf.name)} ${c.dim('· proveedor ' + provider + ' · ' + path.relative(process.cwd(), runDir))}`);
+      console.log(`\n${c.b('▶ ' + wf.name)} ${c.dim('· provider ' + provider + ' · ' + path.relative(process.cwd(), runDir))}`);
       let n = 0;
       const run = await C.runWorkflow(lib, wf, inputs, {
         llm: makeLLM(provider, runDir),
         human: async ({ node, context, step }) => {
-          console.log(`\n${c.y('🧑 Revisión humana:')} ${c.b(step.title)}${node.owner ? c.dim(' · ' + node.owner) : ''}`);
+          console.log(`\n${c.y('🧑 Human review:')} ${c.b(step.title)}${node.owner ? c.dim(' · ' + node.owner) : ''}`);
           if (node.instructions) console.log(c.dim(node.instructions));
-          if (flags['auto-approve']) { console.log(c.g('  ✔ aprobado automáticamente')); return { approved: true, notes: 'auto-approve' }; }
-          if (context) console.log(c.dim('─'.repeat(60)) + '\n' + context.slice(0, 4000) + (context.length > 4000 ? c.dim('\n…(ver ficheros del run)') : '') + '\n' + c.dim('─'.repeat(60)));
-          const a = (await ask(c.cy('¿Aprobar? [S]í / [c]ambios: '))).trim().toLowerCase();
-          if (a.startsWith('c') || a.startsWith('n')) return { approved: false, notes: await ask(c.cy('¿Qué hay que cambiar? ')) };
-          return { approved: true, notes: await ask(c.dim('Comentario (opcional): ')) };
+          if (flags['auto-approve']) { console.log(c.g('  ✔ approved automatically')); return { approved: true, notes: 'auto-approve' }; }
+          if (context) console.log(c.dim('─'.repeat(60)) + '\n' + context.slice(0, 4000) + (context.length > 4000 ? c.dim('\n…(see the run files)') : '') + '\n' + c.dim('─'.repeat(60)));
+          const a = (await ask(c.cy('Approve? [Y]es / [c]hanges: '))).trim().toLowerCase();
+          if (a.startsWith('c') || a.startsWith('n')) return { approved: false, notes: await ask(c.cy('What needs to change? ')) };
+          return { approved: true, notes: await ask(c.dim('Comment (optional): ')) };
         },
         choose: async ({ edges, answer, options }) => {
-          console.log(c.y('No se reconoció la opción en: ') + c.dim(String(answer).split('\n')[0]));
+          console.log(c.y('Option not recognized in: ') + c.dim(String(answer).split('\n')[0]));
           options.forEach((o, i) => console.log(`  ${i + 1}. ${o}`));
-          const k = parseInt(await ask(c.cy('Elige opción: ')), 10) - 1;
+          const k = parseInt(await ask(c.cy('Choose an option: ')), 10) - 1;
           return edges[k] || edges[0];
         },
         onEvent: (type, d) => {
           if (type === 'step:done') {
             n++;
-            fs.writeFileSync(path.join(runDir, `${String(n).padStart(2, '0')}-${C.slugify(d.title)}.md`), `# ${d.title}\n\n${d.decision ? `> Decisión: ${d.decision}\n\n` : ''}${d.output || ''}\n`);
+            fs.writeFileSync(path.join(runDir, `${String(n).padStart(2, '0')}-${C.slugify(d.title)}.md`), `# ${d.title}\n\n${d.decision ? `> Decision: ${d.decision}\n\n` : ''}${d.output || ''}\n`);
             console.log(`${c.g('  ✔')} ${d.title}${d.decision ? c.dim(' → ' + d.decision) : ''}`);
           }
           if (type === 'step:error') console.log(c.r('  ✖ ' + d.title + ': ' + d.error));
@@ -293,8 +293,8 @@ async function main() {
         }
       });
       fs.writeFileSync(path.join(runDir, 'run.json'), JSON.stringify(run, null, 2));
-      fs.writeFileSync(path.join(runDir, 'INFORME.md'), C.runReport(run, wf));
-      console.log(`\n${run.status === 'completed' ? c.g('🎉 Completado') : c.r('⚠ ' + run.status + (run.error ? ': ' + run.error : ''))} · informe: ${path.relative(process.cwd(), path.join(runDir, 'INFORME.md'))}`);
+      fs.writeFileSync(path.join(runDir, 'REPORT.md'), C.runReport(run, wf));
+      console.log(`\n${run.status === 'completed' ? c.g('🎉 Completed') : c.r('⚠ ' + run.status + (run.error ? ': ' + run.error : ''))} · report: ${path.relative(process.cwd(), path.join(runDir, 'REPORT.md'))}`);
       if (rl) rl.close();
       process.exit(run.status === 'completed' ? 0 : 1);
       break;
@@ -302,22 +302,22 @@ async function main() {
 
     case 'agents-md': {
       const lib = loadLib();
-      const intro = '<!-- Generado con: node cli/aic.mjs agents-md -->\n\n';
-      const how = `\n## Cómo ejecutar un workflow de este framework\n\n1. Lee el JSON del workflow en \`library/workflows/<id>.workflow.json\` o, mejor, su runbook: \`node cli/aic.mjs runbook <id>\`.\n2. Sigue el runbook paso a paso adoptando el rol de cada agente (\`library/agents/\`), aplicando sus skills (\`library/skills/\`) y su conocimiento (\`library/knowledge/\`).\n3. Detente en las revisiones humanas.\n4. Para ejecutarlo de forma automática: \`node cli/aic.mjs run <id> --provider copilot|claude-code|anthropic|github\`.\n\n## Mantener la librería\n\n- Edita ficheros en \`library/\` respetando el formato de \`docs/FORMATO.md\`.\n- Después: \`node cli/aic.mjs lint && node cli/aic.mjs bundle\`.\n`;
+      const intro = '<!-- Generated with: node cli/aic.mjs agents-md -->\n\n';
+      const how = `\n## How to run a workflow of this framework\n\n1. Read the workflow JSON in \`library/workflows/<id>.workflow.json\` or, better, its runbook: \`node cli/aic.mjs runbook <id>\`.\n2. Follow the runbook step by step adopting each agent's role (\`library/agents/\`), applying its skills (\`library/skills/\`) and its knowledge (\`library/knowledge/\`).\n3. Stop at human reviews.\n4. To run it automatically: \`node cli/aic.mjs run <id> --provider copilot|claude-code|anthropic|github\`.\n\n## Maintaining the library\n\n- Edit files in \`library/\` following the format in \`docs/FORMAT.md\`.\n- Then: \`node cli/aic.mjs lint && node cli/aic.mjs bundle\`.\n`;
       fs.writeFileSync(path.join(ROOT, 'AGENTS.md'), intro + C.agentsMd(lib, 'library') + how);
-      console.log(c.g('✔') + ' AGENTS.md regenerado');
+      console.log(c.g('✔') + ' AGENTS.md regenerated');
       break;
     }
 
     case 'new': {
       const type = pos[0]; const name = pos.slice(1).join(' ');
-      if (!C.TYPES[type] || !name) die('Uso: new <tipo> "<nombre>"');
-      const it = C.newItem(type, { id: C.slugify(name), name, description: 'TODO: describe cuándo usarlo.', body: '# ' + name + '\n\nTODO\n' });
+      if (!C.TYPES[type] || !name) die('Usage: new <type> "<name>"');
+      const it = C.newItem(type, { id: C.slugify(name), name, description: 'TODO: describe when to use it.', body: '# ' + name + '\n\nTODO\n' });
       const f = C.itemToFile(it);
       const full = path.join(LIB_DIR, f.path);
-      if (fs.existsSync(full)) die('Ya existe ' + f.path);
+      if (fs.existsSync(full)) die('Already exists: ' + f.path);
       writeOut(LIB_DIR, f.path, f.content);
-      console.log(c.g('✔') + ' Creado library/' + f.path);
+      console.log(c.g('✔') + ' Created library/' + f.path);
       break;
     }
 

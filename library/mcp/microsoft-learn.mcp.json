@@ -1,6 +1,6 @@
 {
   "name": "Microsoft Learn Docs",
-  "description": "Búsqueda en la documentación oficial de Microsoft (Azure, .NET, M365, Power Platform) para respuestas actualizadas.",
+  "description": "Search across official Microsoft documentation (Azure, .NET, M365, Power Platform) for up-to-date answers.",
   "icon": "📘",
   "transport": "http",
   "url": "https://learn.microsoft.com/api/mcp",
@@ -10,7 +10,7 @@
   ],
   "audience": [
     "dev",
-    "arquitectura"
+    "architecture"
   ],
   "targets": [
     "copilot",
@@ -21,5 +21,5 @@
   "version": "1.0.0",
   "author": "AI Center",
   "updated": "2026-10-24",
-  "notes": "Servidor público sin autenticación. Reduce alucinaciones en preguntas sobre productos Microsoft."
+  "notes": "Public server, no authentication. Reduces hallucinations on Microsoft product questions."
 }

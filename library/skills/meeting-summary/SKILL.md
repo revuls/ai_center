@@ -1,11 +1,11 @@
 ---
 name: meeting-summary
-description: "Convierte transcripciones o notas de reuniones en un resumen accionable: decisiones, acciones con responsable y fecha, riesgos y dudas. Úsala tras reuniones de Teams o notas sueltas."
+description: "Turns meeting transcripts or notes into an actionable summary: decisions, actions with owner and date, risks and questions. Use it after Teams meetings or loose notes."
 metadata:
-  title: Resumen de reuniones
+  title: Meeting summary
   icon: 🗒️
-  tags: negocio, reuniones, m365
-  audience: negocio, po, todos
+  tags: business, meetings, m365
+  audience: business, po, all
   targets: m365, any
   status: stable
   version: "1.0.0"
@@ -13,24 +13,24 @@ metadata:
   updated: 2026-10-24
 ---
 
-# Resumen de reuniones
+# Meeting summary
 
-## Procedimiento
-1. Identifica objetivo, asistentes y temas tratados.
-2. Extrae **decisiones** (qué se decidió y por qué).
-3. Extrae **acciones**: verbo + entregable + **responsable** + **fecha** (si no hay fecha, márcala como *pendiente*).
-4. Señala **riesgos**, **bloqueos** y **preguntas abiertas**.
-5. No inventes responsables ni fechas.
+## Procedure
+1. Identify the goal, attendees and topics discussed.
+2. Extract **decisions** (what was decided and why).
+3. Extract **actions**: verb + deliverable + **owner** + **date** (if there is no date, mark it as *pending*).
+4. Flag **risks**, **blockers** and **open questions**.
+5. Do not invent owners or dates.
 
-## Formato
-**Resumen (3 líneas máx.)**
+## Format
+**Summary (max 3 lines)**
 
-**Decisiones**
+**Decisions**
 - …
 
-**Acciones**
-| Acción | Responsable | Fecha |
+**Actions**
+| Action | Owner | Date |
 |---|---|---|
 
-**Riesgos y dudas**
+**Risks and questions**
 - …

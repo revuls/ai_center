@@ -1,14 +1,14 @@
 {
-  "name": "De idea a backlog priorizado",
-  "description": "Para Product Owners: analiza una iniciativa, la divide en historias, define criterios de aceptación y prioriza con RICE, con validación de negocio.",
+  "name": "From idea to prioritized backlog",
+  "description": "For Product Owners: analyzes an initiative, splits it into stories, defines acceptance criteria and prioritizes with RICE, with business validation.",
   "icon": "🧭",
   "tags": [
-    "producto",
+    "product",
     "agile"
   ],
   "audience": [
     "po",
-    "negocio"
+    "business"
   ],
   "targets": [
     "copilot",
@@ -22,12 +22,12 @@
   "inputs": [
     {
       "name": "idea",
-      "label": "Iniciativa",
+      "label": "Initiative",
       "required": true
     },
     {
-      "name": "objetivo",
-      "label": "Objetivo de negocio / OKR",
+      "name": "goal",
+      "label": "Business goal / OKR",
       "required": false
     }
   ],
@@ -35,37 +35,37 @@
     {
       "id": "start",
       "type": "start",
-      "title": "Inicio",
+      "title": "Start",
       "x": 40,
       "y": 160
     },
     {
       "id": "stories",
       "type": "step",
-      "title": "Historias y criterios",
+      "title": "Stories and criteria",
       "agent": "product-owner",
-      "prompt": "refinar-historia",
-      "outputKey": "historias",
+      "prompt": "refine-idea",
+      "outputKey": "stories",
       "x": 260,
       "y": 140
     },
     {
       "id": "prio",
       "type": "step",
-      "title": "Priorizar con RICE",
+      "title": "Prioritize with RICE",
       "agent": "product-owner",
-      "prompt": "priorizar-backlog",
+      "prompt": "prioritize-backlog",
       "vars": {
-        "elementos": "{{historias}}"
+        "items": "{{stories}}"
       },
-      "outputKey": "priorizacion",
+      "outputKey": "prioritization",
       "x": 560,
       "y": 140
     },
     {
       "id": "biz_ok",
       "type": "human",
-      "title": "Validación con negocio",
+      "title": "Business validation",
       "owner": "Stakeholders",
       "x": 860,
       "y": 150
@@ -73,8 +73,8 @@
     {
       "id": "end",
       "type": "end",
-      "title": "Backlog listo",
-      "deliverable": "Historias priorizadas listas para refinamiento técnico",
+      "title": "Backlog ready",
+      "deliverable": "Prioritized stories ready for technical refinement",
       "x": 1140,
       "y": 160
     }
@@ -99,13 +99,13 @@
       "id": "i4",
       "from": "biz_ok",
       "to": "end",
-      "label": "aprobado"
+      "label": "approved"
     },
     {
       "id": "i5",
       "from": "biz_ok",
       "to": "stories",
-      "label": "cambios"
+      "label": "changes"
     }
   ]
 }

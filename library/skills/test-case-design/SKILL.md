@@ -1,8 +1,8 @@
 ---
 name: test-case-design
-description: Diseña casos de prueba a partir de historias o código usando particiones de equivalencia, valores límite, tablas de decisión y escenarios de error. Úsala al preparar planes de prueba o tests automatizados.
+description: Designs test cases from stories or code using equivalence partitioning, boundary values, decision tables and error scenarios. Use it when preparing test plans or automated tests.
 metadata:
-  title: Diseño de casos de prueba
+  title: Test case design
   icon: 🧪
   tags: qa, testing
   audience: qa, dev
@@ -13,22 +13,22 @@ metadata:
   updated: 2026-10-24
 ---
 
-# Diseño de casos de prueba
+# Test case design
 
-## Técnicas
-- **Particiones de equivalencia**: un caso por clase de entrada válida/inválida.
-- **Valores límite**: mínimo, mínimo-1, máximo, máximo+1, vacío.
-- **Tablas de decisión**: combinaciones de reglas de negocio.
-- **Transición de estados**: estados válidos e inválidos.
-- **Errores y resiliencia**: timeouts, dependencias caídas, datos corruptos.
-- **No funcionales**: seguridad (OWASP), accesibilidad (WCAG), rendimiento.
+## Techniques
+- **Equivalence partitioning**: one case per valid/invalid input class.
+- **Boundary values**: minimum, minimum-1, maximum, maximum+1, empty.
+- **Decision tables**: combinations of business rules.
+- **State transitions**: valid and invalid states.
+- **Errors and resilience**: timeouts, unavailable dependencies, corrupt data.
+- **Non-functional**: security (OWASP), accessibility (WCAG), performance.
 
-## Procedimiento
-1. Extrae reglas y criterios de aceptación.
-2. Aplica las técnicas para generar casos; elimina duplicados.
-3. Prioriza por **riesgo** (impacto × probabilidad).
-4. Indica qué automatizar (unitario / integración / E2E) y qué probar en exploratorio.
+## Procedure
+1. Extract rules and acceptance criteria.
+2. Apply the techniques to generate cases; remove duplicates.
+3. Prioritize by **risk** (impact × likelihood).
+4. Decide what to automate (unit / integration / E2E) and what to explore manually.
 
-## Formato
-| ID | Título | Precondiciones | Pasos | Resultado esperado | Prioridad | Nivel |
+## Format
+| ID | Title | Preconditions | Steps | Expected result | Priority | Level |
 |---|---|---|---|---|---|---|

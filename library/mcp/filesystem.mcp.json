@@ -1,6 +1,6 @@
 {
-  "name": "Sistema de ficheros",
-  "description": "Acceso de lectura/escritura a una carpeta local concreta para agentes que no tienen herramientas de ficheros nativas.",
+  "name": "File system",
+  "description": "Read/write access to a specific local folder for agents that lack native file tools.",
   "icon": "🗂️",
   "transport": "stdio",
   "command": "npx",
@@ -24,5 +24,5 @@
   "version": "1.0.0",
   "author": "AI Center",
   "updated": "2026-10-24",
-  "notes": "Limita siempre la ruta permitida (último argumento). Copilot y Claude Code ya tienen herramientas de ficheros nativas."
+  "notes": "Always restrict the allowed path (last argument). Copilot and Claude Code already have native file tools."
 }

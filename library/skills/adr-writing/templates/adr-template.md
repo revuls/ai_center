@@ -1,19 +1,19 @@
-# ADR-NNN: <Título de la decisión>
+# ADR-NNN: <Decision title>
 
-- **Estado**: Propuesta | Aceptada | Sustituida por ADR-XXX
-- **Fecha**: AAAA-MM-DD
-- **Decisores**: …
+- **Status**: Proposed | Accepted | Superseded by ADR-XXX
+- **Date**: YYYY-MM-DD
+- **Deciders**: …
 
-## Contexto
+## Context
 …
 
-## Opciones consideradas
+## Options considered
 1. …
 2. …
 
-## Decisión
+## Decision
 …
 
-## Consecuencias
+## Consequences
 - ✅ …
 - ⚠️ …

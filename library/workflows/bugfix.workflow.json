@@ -1,6 +1,6 @@
 {
-  "name": "Corrección de bug",
-  "description": "Del reporte de un bug a la corrección verificada: análisis de causa raíz, reproducción, fix mínimo con test de regresión y revisión.",
+  "name": "Bug fix",
+  "description": "From a bug report to a verified fix: root cause analysis, reproduction, minimal fix with regression test and review.",
   "icon": "🐞",
   "tags": [
     "dev",
@@ -22,15 +22,15 @@
   "updated": "2026-10-24",
   "inputs": [
     {
-      "name": "sintomas",
-      "label": "Síntomas",
-      "description": "Qué ocurre, qué se esperaba y desde cuándo",
+      "name": "symptoms",
+      "label": "Symptoms",
+      "description": "What happens, what was expected and since when",
       "required": true
     },
     {
       "name": "logs",
-      "label": "Logs / trazas",
-      "description": "Opcional",
+      "label": "Logs / traces",
+      "description": "Optional",
       "required": false
     }
   ],
@@ -38,42 +38,42 @@
     {
       "id": "start",
       "type": "start",
-      "title": "Inicio",
+      "title": "Start",
       "x": 40,
       "y": 200
     },
     {
       "id": "analyze",
       "type": "step",
-      "title": "Analizar el bug",
+      "title": "Analyze the bug",
       "agent": "developer",
-      "prompt": "analizar-bug",
-      "outputKey": "analisis",
+      "prompt": "analyze-bug",
+      "outputKey": "analysis",
       "x": 260,
       "y": 180
     },
     {
       "id": "repro",
       "type": "condition",
-      "title": "¿Reproducible?",
-      "question": "¿El análisis indica que el bug es REPRODUCIBLE con la información disponible?",
+      "title": "Reproducible?",
+      "question": "Does the analysis say the bug is REPRODUCIBLE with the available information?",
       "x": 560,
       "y": 190
     },
     {
       "id": "more_info",
       "type": "human",
-      "title": "Pedir más información",
-      "instructions": "Aporta la información que falta (pasos, datos, entorno, logs) en los comentarios.",
+      "title": "Ask for more information",
+      "instructions": "Provide the missing information (steps, data, environment, logs) in the comments.",
       "x": 840,
       "y": 340
     },
     {
       "id": "fix",
       "type": "step",
-      "title": "Corregir con test de regresión",
+      "title": "Fix with a regression test",
       "agent": "developer",
-      "instructions": "Escribe primero un test que reproduzca el bug, aplica la corrección mínima según el análisis:\n\n{{analisis}}\n\ny verifica que todos los tests pasan.",
+      "instructions": "First write a test that reproduces the bug, apply the minimal fix based on the analysis:\n\n{{analysis}}\n\nand check that all tests pass.",
       "outputKey": "fix",
       "x": 840,
       "y": 100
@@ -81,24 +81,24 @@
     {
       "id": "review",
       "type": "step",
-      "title": "Revisión",
+      "title": "Review",
       "agent": "code-reviewer",
-      "instructions": "Revisa la corrección y el test de regresión. Comprueba efectos colaterales.",
+      "instructions": "Review the fix and the regression test. Check for side effects.",
       "x": 1130,
       "y": 100
     },
     {
       "id": "ok",
       "type": "human",
-      "title": "Aprobar corrección",
-      "instructions": "Valida la corrección antes de integrarla.",
+      "title": "Approve the fix",
+      "instructions": "Validate the fix before merging it.",
       "x": 1420,
       "y": 110
     },
     {
       "id": "end",
       "type": "end",
-      "title": "Bug corregido",
+      "title": "Bug fixed",
       "x": 1700,
       "y": 120
     }
@@ -118,7 +118,7 @@
       "id": "b3",
       "from": "repro",
       "to": "fix",
-      "label": "sí"
+      "label": "yes"
     },
     {
       "id": "b4",
@@ -145,13 +145,13 @@
       "id": "b8",
       "from": "ok",
       "to": "end",
-      "label": "aprobado"
+      "label": "approved"
     },
     {
       "id": "b9",
       "from": "ok",
       "to": "fix",
-      "label": "cambios"
+      "label": "changes"
     }
   ]
 }

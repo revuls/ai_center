@@ -1,6 +1,6 @@
 ---
-name: Convenciones TypeScript
-description: "Estándares para código TypeScript/React: tipado estricto, funciones puras, manejo de errores y estilo."
+name: TypeScript conventions
+description: "Standards for TypeScript/React code: strict typing, pure functions, error handling and style."
 icon: 🟦
 applyTo: "**/*.ts,**/*.tsx"
 tags: [dev, typescript]
@@ -12,10 +12,10 @@ author: AI Center
 updated: 2026-10-24
 ---
 
-- Usa `strict` y evita `any`; prefiere `unknown` + *type guards*.
-- Funciones pequeñas y puras; efectos secundarios en los bordes (servicios, adaptadores).
-- Nombres descriptivos en inglés; `camelCase` para variables/funciones y `PascalCase` para tipos y componentes.
-- Maneja errores explícitamente: nunca silencies excepciones; usa tipos `Result` o errores de dominio.
-- Componentes React: funcionales, *hooks* para estado, props tipadas, sin lógica de negocio en la vista.
-- Importa por alias de ruta del proyecto; no uses rutas relativas profundas (`../../../`).
-- Cada cambio de comportamiento va acompañado de tests.
+- Use `strict` and avoid `any`; prefer `unknown` + *type guards*.
+- Small, pure functions; side effects at the edges (services, adapters).
+- Descriptive English names; `camelCase` for variables/functions and `PascalCase` for types and components.
+- Handle errors explicitly: never swallow exceptions; use `Result` types or domain errors.
+- React components: functional, *hooks* for state, typed props, no business logic in the view.
+- Import through the project's path aliases; avoid deep relative paths (`../../../`).
+- Every behavior change comes with tests.

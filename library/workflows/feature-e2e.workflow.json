@@ -1,10 +1,10 @@
 {
-  "name": "Feature de principio a fin",
-  "description": "De una idea de negocio a una Pull Request lista: refinamiento con el PO, diseño técnico, implementación con tests, revisión de código, QA y documentación, con aprobaciones humanas en los hitos.",
+  "name": "Feature end to end",
+  "description": "From a business idea to a ready Pull Request: refinement with the PO, technical design, implementation with tests, code review, QA and documentation, with human approvals at the milestones.",
   "icon": "🚀",
   "tags": [
     "dev",
-    "producto",
+    "product",
     "e2e"
   ],
   "audience": [
@@ -25,14 +25,14 @@
   "inputs": [
     {
       "name": "idea",
-      "label": "Idea o necesidad",
-      "description": "Qué quiere conseguir negocio y para quién",
+      "label": "Idea or need",
+      "description": "What the business wants to achieve and for whom",
       "required": true
     },
     {
-      "name": "contexto",
-      "label": "Contexto",
-      "description": "Restricciones, fechas, enlaces (opcional)",
+      "name": "context",
+      "label": "Context",
+      "description": "Constraints, dates, links (optional)",
       "required": false
     }
   ],
@@ -40,61 +40,61 @@
     {
       "id": "start",
       "type": "start",
-      "title": "Inicio",
+      "title": "Start",
       "x": 40,
       "y": 260
     },
     {
       "id": "refine",
       "type": "step",
-      "title": "Refinar la idea en historias",
+      "title": "Refine the idea into stories",
       "agent": "product-owner",
-      "prompt": "refinar-historia",
-      "outputKey": "historias",
-      "deliverable": "Historias con criterios de aceptación en Gherkin y priorización",
+      "prompt": "refine-idea",
+      "outputKey": "stories",
+      "deliverable": "Stories with Gherkin acceptance criteria and prioritization",
       "x": 260,
       "y": 240
     },
     {
       "id": "po_ok",
       "type": "human",
-      "title": "Aprobación del PO",
+      "title": "PO approval",
       "owner": "Product Owner",
-      "instructions": "Revisa que las historias reflejan la necesidad, que los criterios de aceptación son completos y que el alcance es correcto.",
+      "instructions": "Check that the stories reflect the need, the acceptance criteria are complete and the scope is right.",
       "x": 560,
       "y": 250
     },
     {
       "id": "design",
       "type": "step",
-      "title": "Diseño técnico",
+      "title": "Technical design",
       "agent": "architect",
-      "prompt": "diseno-tecnico",
+      "prompt": "technical-design",
       "vars": {
-        "historia": "{{historias}}"
+        "story": "{{stories}}"
       },
-      "outputKey": "diseno",
-      "deliverable": "Diseño técnico, ADR si aplica y plan de implementación",
+      "outputKey": "design",
+      "deliverable": "Technical design, ADR if applicable and implementation plan",
       "x": 840,
       "y": 240
     },
     {
       "id": "design_ok",
       "type": "human",
-      "title": "Validar diseño",
+      "title": "Validate design",
       "owner": "Tech Lead",
-      "instructions": "Comprueba que el diseño encaja con la arquitectura, es seguro y el plan es realista.",
+      "instructions": "Check that the design fits the architecture, is secure and the plan is realistic.",
       "x": 1140,
       "y": 250
     },
     {
       "id": "impl",
       "type": "step",
-      "title": "Implementar con tests",
+      "title": "Implement with tests",
       "agent": "developer",
-      "instructions": "Implementa las historias aprobadas siguiendo el diseño:\n\n{{diseno}}\n\nTrabaja en una rama nueva, en pasos pequeños, con tests en verde.",
-      "outputKey": "implementacion",
-      "deliverable": "Código y tests en una rama, resumen de cambios y mensaje de commit",
+      "instructions": "Implement the approved stories following the design:\n\n{{design}}\n\nWork on a new branch, in small steps, with green tests.",
+      "outputKey": "implementation",
+      "deliverable": "Code and tests on a branch, summary of changes and commit message",
       "context": "all",
       "x": 1420,
       "y": 240
@@ -102,31 +102,31 @@
     {
       "id": "review",
       "type": "step",
-      "title": "Revisión de código",
+      "title": "Code review",
       "agent": "code-reviewer",
-      "instructions": "Revisa los cambios de la rama de implementación contra la historia y el diseño. La primera línea debe ser APROBADO o CAMBIOS NECESARIOS.",
-      "outputKey": "revision",
+      "instructions": "Review the implementation branch changes against the story and the design. The first line must be APPROVED or CHANGES REQUIRED.",
+      "outputKey": "review",
       "x": 1720,
       "y": 240
     },
     {
       "id": "review_ok",
       "type": "condition",
-      "title": "¿Revisión aprobada?",
-      "question": "¿El revisor ha dado el veredicto APROBADO (sin hallazgos bloqueantes)?",
+      "title": "Review approved?",
+      "question": "Did the reviewer give the APPROVED verdict (no blocking findings)?",
       "x": 2010,
       "y": 250
     },
     {
       "id": "qa",
       "type": "step",
-      "title": "Validación QA",
+      "title": "QA validation",
       "agent": "qa-engineer",
-      "prompt": "plan-de-pruebas",
+      "prompt": "test-plan",
       "vars": {
-        "funcionalidad": "{{historias}}"
+        "feature": "{{stories}}"
       },
-      "instructions": "Diseña el plan de pruebas, automatiza los casos prioritarios y ejecútalos. Reporta defectos.",
+      "instructions": "Design the test plan, automate the priority cases and run them. Report defects.",
       "outputKey": "qa",
       "context": "all",
       "x": 2290,
@@ -135,14 +135,14 @@
     {
       "id": "docs",
       "type": "step",
-      "title": "Documentar y preparar PR",
+      "title": "Document and prepare the PR",
       "agent": "tech-writer",
-      "prompt": "descripcion-pr",
+      "prompt": "pr-description",
       "vars": {
-        "cambios": "{{implementacion}}"
+        "changes": "{{implementation}}"
       },
       "outputKey": "pr",
-      "deliverable": "Descripción de PR y release notes",
+      "deliverable": "PR description and release notes",
       "context": "all",
       "x": 2580,
       "y": 150
@@ -150,24 +150,24 @@
     {
       "id": "final_ok",
       "type": "human",
-      "title": "Revisión final",
-      "owner": "Equipo",
-      "instructions": "Revisa la PR completa (código, tests, QA y documentación) antes de abrirla/mergearla.",
+      "title": "Final review",
+      "owner": "Team",
+      "instructions": "Review the complete PR (code, tests, QA and documentation) before opening/merging it.",
       "x": 2870,
       "y": 160
     },
     {
       "id": "end",
       "type": "end",
-      "title": "PR lista",
-      "deliverable": "Pull Request lista para merge",
+      "title": "PR ready",
+      "deliverable": "Pull Request ready to merge",
       "x": 3150,
       "y": 170
     },
     {
       "id": "note1",
       "type": "note",
-      "text": "💡 Ejecuta este workflow con Copilot en modo agente (/wf-feature-e2e) o desde la CLI con --provider copilot para que los pasos trabajen sobre tu repositorio.",
+      "text": "💡 Run this workflow with Copilot in agent mode (/wf-feature-e2e) or from the CLI with --provider copilot so the steps work on your repository.",
       "x": 260,
       "y": 470
     }
@@ -187,13 +187,13 @@
       "id": "e3",
       "from": "po_ok",
       "to": "design",
-      "label": "aprobado"
+      "label": "approved"
     },
     {
       "id": "e4",
       "from": "po_ok",
       "to": "refine",
-      "label": "cambios"
+      "label": "changes"
     },
     {
       "id": "e5",
@@ -204,13 +204,13 @@
       "id": "e6",
       "from": "design_ok",
       "to": "impl",
-      "label": "aprobado"
+      "label": "approved"
     },
     {
       "id": "e7",
       "from": "design_ok",
       "to": "design",
-      "label": "cambios"
+      "label": "changes"
     },
     {
       "id": "e8",
@@ -226,7 +226,7 @@
       "id": "e10",
       "from": "review_ok",
       "to": "qa",
-      "label": "sí"
+      "label": "yes"
     },
     {
       "id": "e11",
@@ -248,14 +248,14 @@
       "id": "e14",
       "from": "final_ok",
       "to": "end",
-      "label": "aprobado"
+      "label": "approved"
     },
     {
       "id": "e15",
       "from": "final_ok",
       "to": "impl",
-      "label": "cambios"
+      "label": "changes"
     }
   ],
-  "notes": "Workflow de referencia del equipo para desarrollar una funcionalidad completa con agentes y control humano en los hitos."
+  "notes": "The team's reference workflow for building a complete feature with agents and human control at the milestones."
 }

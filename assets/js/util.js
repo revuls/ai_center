@@ -1,4 +1,4 @@
-/* AI Center · util.js — DOM, markdown, diálogos, portapapeles, zip */
+/* AI Center · util.js — DOM, markdown, dialogs, clipboard, zip */
 (function () {
   'use strict';
   const AIC = (window.AIC = window.AIC || {});
@@ -36,7 +36,7 @@
   const esc = (s) => String(s === undefined || s === null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const debounce = (fn, ms) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; };
 
-  /* ---------- Iconos (SVG en línea) ---------- */
+  /* ---------- Icons (inline SVG) ---------- */
   const P = {
     search: '<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>',
     plus: '<path d="M12 5v14M5 12h14"/>',
@@ -90,7 +90,7 @@
       opts.icon ? icon(opts.icon, opts.iconSize) : null, label ? h('span', null, label) : null);
   };
 
-  /* ---------- Markdown (seguro: escapa HTML) ---------- */
+  /* ---------- Markdown (safe: escapes HTML) ---------- */
   function safeUrl(u) {
     u = String(u || '').trim();
     if (/^(https?:|mailto:|#|\.{0,2}\/|[\w-]+\.[\w./-]*$)/i.test(u) && !/^javascript:/i.test(u)) return u;
@@ -185,7 +185,7 @@
     setTimeout(() => { t.style.transition = 'opacity .2s'; t.style.opacity = '0'; setTimeout(() => t.remove(), 220); }, ms || 2600);
   }
 
-  /* ---------- Modales ---------- */
+  /* ---------- Modals ---------- */
   const openModals = [];
   function modal(opts) {
     const close = (v) => {
@@ -200,7 +200,7 @@
     const body = h('div', { class: 'modal-body' }, opts.body);
     const foot = opts.foot ? h('div', { class: 'modal-foot' }, typeof opts.foot === 'function' ? opts.foot(close) : opts.foot) : null;
     const m = h('div', { class: 'modal ' + (opts.size || ''), role: 'dialog', 'aria-modal': 'true' },
-      opts.title ? h('div', { class: 'modal-head' }, opts.titleIcon ? h('span', { style: { fontSize: '20px' } }, opts.titleIcon) : null, h('h3', null, opts.title), h('button', { class: 'btn ghost icon close', onclick: () => close(), title: 'Cerrar (Esc)' }, icon('x'))) : null,
+      opts.title ? h('div', { class: 'modal-head' }, opts.titleIcon ? h('span', { style: { fontSize: '20px' } }, opts.titleIcon) : null, h('h3', null, opts.title), h('button', { class: 'btn ghost icon close', onclick: () => close(), title: 'Close (Esc)' }, icon('x'))) : null,
       body, foot);
     const ov = h('div', { class: 'overlay', onmousedown: (e) => { if (e.target === ov && !opts.sticky) close(); } }, m);
     document.body.appendChild(ov);
@@ -213,8 +213,8 @@
     opts = opts || {};
     return new Promise((res) => {
       const md_ = modal({
-        title: opts.title || 'Confirmar', size: 'narrow', body: h('p', { style: { margin: 0 } }, msg),
-        foot: (close) => [btn('Cancelar', () => close(false), { cls: 'ghost' }), btn(opts.ok || 'Aceptar', () => close(true), { cls: opts.danger ? 'danger' : 'primary' })],
+        title: opts.title || 'Confirm', size: 'narrow', body: h('p', { style: { margin: 0 } }, msg),
+        foot: (close) => [btn('Cancel', () => close(false), { cls: 'ghost' }), btn(opts.ok || 'OK', () => close(true), { cls: opts.danger ? 'danger' : 'primary' })],
         onClose: (v) => res(!!v)
       });
       void md_;
@@ -228,7 +228,7 @@
       const m = modal({
         title, size: 'narrow',
         body: [opts.help ? h('p', { class: 'muted small', style: { marginTop: 0 } }, opts.help) : null, inp],
-        foot: (close) => [btn('Cancelar', () => close(), { cls: 'ghost' }), btn(opts.ok || 'Aceptar', () => { result = inp.value; close(); }, { cls: 'primary' })],
+        foot: (close) => [btn('Cancel', () => close(), { cls: 'ghost' }), btn(opts.ok || 'OK', () => { result = inp.value; close(); }, { cls: 'primary' })],
         onClose: () => res(result)
       });
       if (!opts.multiline) inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') { result = inp.value; m.close(); } });
@@ -261,7 +261,7 @@
     return p;
   }
 
-  /* ---------- Portapapeles y descargas ---------- */
+  /* ---------- Clipboard and downloads ---------- */
   async function copy(text, msg) {
     try { await navigator.clipboard.writeText(text); }
     catch (e) {
@@ -269,7 +269,7 @@
       try { document.execCommand('copy'); } catch (e2) { /* ignore */ }
       ta.remove();
     }
-    toast(msg || 'Copiado al portapapeles', 'ok');
+    toast(msg || 'Copied to clipboard', 'ok');
   }
   function download(name, data, type) {
     const blob = data instanceof Blob ? data : new Blob([data], { type: type || 'text/plain;charset=utf-8' });
@@ -288,7 +288,7 @@
     });
   }
 
-  /* ---------- ZIP (sin compresión, UTF-8) ---------- */
+  /* ---------- ZIP (stored, UTF-8) ---------- */
   const CRC = (() => { const t = []; for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
   function crc32(buf) { let c = 0xFFFFFFFF; for (let i = 0; i < buf.length; i++) c = CRC[(c ^ buf[i]) & 0xFF] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; }
   function zip(files) {
@@ -321,7 +321,7 @@
     return new Blob([...parts, ...central, new Uint8Array(end.buffer)], { type: 'application/zip' });
   }
 
-  /* ---------- Iconos PNG para M365 (canvas) ---------- */
+  /* ---------- PNG icons for M365 (canvas) ---------- */
   function iconPng(ic) {
     return new Promise((res) => {
       const c = document.createElement('canvas'); c.width = c.height = ic.size;
@@ -339,16 +339,16 @@
     });
   }
 
-  /* ---------- Varios ---------- */
+  /* ---------- Misc ---------- */
   function timeAgo(iso) {
     if (!iso) return '';
     const d = new Date(iso); const s = (Date.now() - d.getTime()) / 1000;
     if (isNaN(s)) return iso;
-    if (s < 60) return 'hace un momento';
-    if (s < 3600) return `hace ${Math.floor(s / 60)} min`;
-    if (s < 86400) return `hace ${Math.floor(s / 3600)} h`;
-    if (s < 86400 * 30) return `hace ${Math.floor(s / 86400)} d`;
-    return d.toLocaleDateString('es-ES');
+    if (s < 60) return 'just now';
+    if (s < 3600) return `${Math.floor(s / 60)} min ago`;
+    if (s < 86400) return `${Math.floor(s / 3600)} h ago`;
+    if (s < 86400 * 30) return `${Math.floor(s / 86400)} d ago`;
+    return d.toLocaleDateString('en-GB');
   }
   const EMOJIS = '🤖 🧠 💬 🧩 📏 📚 🔌 🔀 🚀 ✨ 🛠️ 🧪 🐞 🔍 📝 📋 📊 📈 🧭 🏗️ 🎯 🧑‍💻 👩‍💼 🧑‍🎨 🛡️ 🔐 ⚙️ 💡 📦 🗂️ 🧾 📣 🤝 ✅ 🔁 🧹 🌐 🗺️ 🧬 ☁️ 🗃️ 📐 🎨 ⏱️ 🧯 📞 ✉️ 📅 💼 🏷️ 🪄 🧱 🔧'.split(' ');
   const typeColor = (t) => `var(--c-${t})`;

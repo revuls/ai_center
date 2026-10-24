@@ -1,4 +1,4 @@
-/* AI Center · app.js — shell, navegación, paleta de comandos */
+/* AI Center · app.js — shell, navigation, command palette */
 (function () {
   'use strict';
   const AIC = window.AIC;
@@ -9,7 +9,7 @@
 
   const app = {
     cleanup: null,
-    dirty: null,          // función → true si hay cambios sin guardar en la vista
+    dirty: null,          // function → true if the view has unsaved changes
     suppressHash: false,
     lastHash: location.hash,
 
@@ -26,7 +26,7 @@
       await S.init();
     },
 
-    /* ---------- Tema ---------- */
+    /* ---------- Theme ---------- */
     applyTheme() {
       const t = S.prefs.theme;
       if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t;
@@ -65,34 +65,34 @@
         h('span', null, label), count !== undefined ? h('span', { class: 'count' }, count) : null);
       const favs = S.prefs.favorites.filter((k) => S.lib.items.some((i) => S.keyOf(i) === k)).length;
       nav.append(
-        link('#/', 'home', 'Inicio'),
-        link('#/library/favs', 'star', 'Favoritos', favs || undefined),
-        link('#/library/all', 'layout', 'Todo', S.lib.items.length),
-        h('div', { class: 'nav-section' }, 'Librería'),
+        link('#/', 'home', 'Home'),
+        link('#/library/favs', 'star', 'Favorites', favs || undefined),
+        link('#/library/all', 'layout', 'All', S.lib.items.length),
+        h('div', { class: 'nav-section' }, 'Library'),
         ...C.TYPE_ORDER.map((t) => link('#/library/' + t, C.TYPES[t].icon, C.TYPES[t].label, S.all(t).length)),
-        h('div', { class: 'nav-section' }, 'Ejecutar y compartir'),
-        link('#/runs', 'play', 'Ejecuciones'),
-        link('#/export', 'export', 'Exportar a IAs'),
-        link('#/health', 'pulse', 'Salud', (() => { const n = C.lint(S.lib).filter((i) => i.level === 'error').length; return n || undefined; })()),
-        h('div', { class: 'nav-section' }, 'Ayuda'),
-        link('#/guide', 'book', 'Guía y buenas prácticas'),
-        link('#/settings', 'settings', 'Ajustes')
+        h('div', { class: 'nav-section' }, 'Run and share'),
+        link('#/runs', 'play', 'Runs'),
+        link('#/export', 'export', 'Export to AIs'),
+        link('#/health', 'pulse', 'Health', (() => { const n = C.lint(S.lib).filter((i) => i.level === 'error').length; return n || undefined; })()),
+        h('div', { class: 'nav-section' }, 'Help'),
+        link('#/guide', 'book', 'Guide and best practices'),
+        link('#/settings', 'settings', 'Settings')
       );
       const wsn = $('#ws-name'); if (wsn) wsn.textContent = S.lib.config.workspace;
-      // almacenamiento
+      // storage
       const st = this.el.storage; st.innerHTML = '';
       st.className = 'storage' + (S.mode === 'folder' ? ' connected' : '');
       if (S.mode === 'folder') {
-        st.append(h('div', { class: 'st-title' }, h('span', { class: 'st-dot' }), 'Carpeta conectada'),
-          h('div', { class: 'st-desc' }, '📁 ', S.rootDir.name, S.rootDir !== S.libDir ? ' / library' : '', ' · guardado automático en ficheros'),
-          h('div', { class: 'row' }, btn('Recargar', () => S.refresh().then(() => toast('Recargado desde disco')), { cls: 'sm', icon: 'refresh' }), btn('Desconectar', () => S.disconnect(), { cls: 'sm ghost' })));
+        st.append(h('div', { class: 'st-title' }, h('span', { class: 'st-dot' }), 'Folder connected'),
+          h('div', { class: 'st-desc' }, '📁 ', S.rootDir.name, S.rootDir !== S.libDir ? ' / library' : '', ' · auto-saved to files'),
+          h('div', { class: 'row' }, btn('Reload', () => S.refresh().then(() => toast('Reloaded from disk')), { cls: 'sm', icon: 'refresh' }), btn('Disconnect', () => S.disconnect(), { cls: 'sm ghost' })));
       } else {
         const n = S.localChanges();
-        st.append(h('div', { class: 'st-title' }, h('span', { class: 'st-dot' }), S.pendingReconnect ? 'Carpeta sin permiso' : 'Modo lectura (bundle)'),
-          h('div', { class: 'st-desc' }, S.pendingReconnect ? `Pulsa para volver a conectar «${S.pendingReconnect.name}».` : (n ? `${n} cambio(s) solo en este navegador.` : 'Conecta la carpeta del framework para guardar en ficheros.')),
+        st.append(h('div', { class: 'st-title' }, h('span', { class: 'st-dot' }), S.pendingReconnect ? 'Folder without permission' : 'Read-only mode (bundle)'),
+          h('div', { class: 'st-desc' }, S.pendingReconnect ? `Click to reconnect «${S.pendingReconnect.name}».` : (n ? `${n} change(s) only in this browser.` : 'Connect the framework folder to save to files.')),
           S.fsSupported
-            ? btn(S.pendingReconnect ? 'Reconectar carpeta' : 'Conectar carpeta', () => this.connect(), { cls: 'sm primary', icon: 'folder' })
-            : h('div', { class: 'small muted' }, '⚠ Este navegador no permite escribir carpetas: usa Chrome/Edge o exporta en ZIP.'));
+            ? btn(S.pendingReconnect ? 'Reconnect folder' : 'Connect folder', () => this.connect(), { cls: 'sm primary', icon: 'folder' })
+            : h('div', { class: 'small muted' }, '⚠ This browser cannot write to folders: use Chrome/Edge or export as ZIP.'));
       }
     },
     renderTopbar() {
@@ -100,29 +100,29 @@
       const dark = document.documentElement.dataset.theme === 'dark' || (!document.documentElement.dataset.theme && matchMedia('(prefers-color-scheme: dark)').matches);
       tb.append(
         h('button', { class: 'btn ghost icon', style: { display: window.innerWidth < 820 ? '' : 'none' }, onclick: () => $('#shell').classList.toggle('nav-open') }, icon('menu')),
-        h('button', { class: 'search-btn', onclick: () => this.palette() }, icon('search'), h('span', null, 'Buscar prompts, agentes, workflows… o acciones'), h('kbd', null, navigator.platform.includes('Mac') ? '⌘K' : 'Ctrl K')),
+        h('button', { class: 'search-btn', onclick: () => this.palette() }, icon('search'), h('span', null, 'Search prompts, agents, workflows… or actions'), h('kbd', null, navigator.platform.includes('Mac') ? '⌘K' : 'Ctrl K')),
         h('div', { class: 'spacer' }),
-        h('button', { class: 'btn primary', onclick: (e) => this.newMenu(e.currentTarget) }, icon('plus'), h('span', null, 'Nuevo'), icon('chevron', 14)),
-        h('button', { class: 'btn ghost icon', title: 'Cambiar tema', onclick: () => this.toggleTheme() }, icon(dark ? 'sun' : 'moon'))
+        h('button', { class: 'btn primary', onclick: (e) => this.newMenu(e.currentTarget) }, icon('plus'), h('span', null, 'New'), icon('chevron', 14)),
+        h('button', { class: 'btn ghost icon', title: 'Toggle theme', onclick: () => this.toggleTheme() }, icon(dark ? 'sun' : 'moon'))
       );
     },
     renderBanner() {
       const b = this.el.banner; b.innerHTML = '';
       if (S.mode !== 'folder' && S.localChanges()) {
-        b.append(h('div', { class: 'banner' }, '💾', h('span', null, `Tienes ${S.localChanges()} cambio(s) guardados solo en este navegador.`),
-          S.fsSupported ? btn('Guardar en carpeta', () => this.connect(), { cls: 'sm primary', icon: 'folder' }) : null,
-          btn('Descargar ZIP de la librería', () => AIC.views.downloadLibraryZip(), { cls: 'sm', icon: 'download' })));
+        b.append(h('div', { class: 'banner' }, '💾', h('span', null, `You have ${S.localChanges()} change(s) saved only in this browser.`),
+          S.fsSupported ? btn('Save to folder', () => this.connect(), { cls: 'sm primary', icon: 'folder' }) : null,
+          btn('Download library ZIP', () => AIC.views.downloadLibraryZip(), { cls: 'sm', icon: 'download' })));
       }
     },
     async connect() {
-      try { S.pendingReconnect ? await S.reconnect() : await S.connectFolder(); toast('Carpeta conectada: los cambios se guardan en ficheros', 'ok'); }
+      try { S.pendingReconnect ? await S.reconnect() : await S.connectFolder(); toast('Folder connected: changes are saved to files', 'ok'); }
       catch (e) { if (e.name !== 'AbortError') toast(e.message, 'err', 5000); }
     },
     newMenu(anchor) {
       menu(anchor, [
         ...C.TYPE_ORDER.map((t) => ({ icon: C.TYPES[t].icon, label: C.TYPES[t].singular, desc: C.TYPES[t].help.split('.')[0], onClick: () => this.go(t === 'workflow' ? '#/workflow/new' : '#/new/' + t) })),
         '-',
-        { icon: 'upload', label: 'Importar ficheros…', desc: '.md, .json, SKILL.md, bundle o backup', onClick: () => AIC.views.importDialog() }
+        { icon: 'upload', label: 'Import files…', desc: '.md, .json, SKILL.md, bundle or backup', onClick: () => AIC.views.importDialog() }
       ], { align: 'right' });
     },
 
@@ -131,7 +131,7 @@
     async onHash() {
       if (this.suppressHash) { this.suppressHash = false; return; }
       if (this.dirty && this.dirty()) {
-        const ok = await AIC.confirmDialog('Hay cambios sin guardar. ¿Salir igualmente?', { title: 'Cambios sin guardar', ok: 'Salir sin guardar', danger: true });
+        const ok = await AIC.confirmDialog('There are unsaved changes. Leave anyway?', { title: 'Unsaved changes', ok: 'Leave without saving', danger: true });
         if (!ok) { this.suppressHash = true; location.hash = this.lastHash; return; }
       }
       this.route();
@@ -165,7 +165,7 @@
         }
       } catch (e) {
         console.error(e);
-        v.append(h('div', { class: 'page' }, h('div', { class: 'callout err' }, '⚠ ', h('div', null, h('b', null, 'Error al mostrar la vista. '), e.message))));
+        v.append(h('div', { class: 'page' }, h('div', { class: 'callout err' }, '⚠ ', h('div', null, h('b', null, 'Error displaying the view. '), e.message))));
       }
       if (typeof r === 'function') this.cleanup = r;
       this.renderNav();
@@ -175,21 +175,21 @@
       this.go(it.type === 'workflow' ? '#/workflow/' + encodeURIComponent(it.id) : `#/item/${it.type}/${encodeURIComponent(it.id)}`);
     },
 
-    /* ---------- Paleta de comandos ---------- */
+    /* ---------- Command palette ---------- */
     palette() {
       if (document.querySelector('.palette')) return;
-      const inp = h('input', { type: 'text', placeholder: 'Escribe para buscar… (↑↓ para moverte, Enter para abrir)', autofocus: true });
+      const inp = h('input', { type: 'text', placeholder: 'Type to search… (↑↓ to move, Enter to open)', autofocus: true });
       const results = h('div', { class: 'results' });
       const actions = [
-        ...C.TYPE_ORDER.map((t) => ({ label: 'Nuevo ' + C.TYPES[t].singular.toLowerCase(), ico: C.TYPES[t].icon, run: () => this.go(t === 'workflow' ? '#/workflow/new' : '#/new/' + t) })),
-        { label: 'Exportar a GitHub Copilot / M365 / Claude…', ico: '📦', run: () => this.go('#/export') },
-        { label: 'Revisar salud de la librería', ico: '🩺', run: () => this.go('#/health') },
-        { label: 'Ver ejecuciones', ico: '▶️', run: () => this.go('#/runs') },
-        { label: 'Importar ficheros', ico: '📥', run: () => AIC.views.importDialog() },
-        { label: S.mode === 'folder' ? 'Recargar desde disco' : 'Conectar carpeta', ico: '📁', run: () => S.mode === 'folder' ? S.refresh() : this.connect() },
-        { label: 'Cambiar tema claro/oscuro', ico: '🌓', run: () => this.toggleTheme() },
-        { label: 'Guía y buenas prácticas', ico: '📖', run: () => this.go('#/guide') },
-        { label: 'Ajustes', ico: '⚙️', run: () => this.go('#/settings') }
+        ...C.TYPE_ORDER.map((t) => ({ label: 'New ' + C.TYPES[t].singular.toLowerCase(), ico: C.TYPES[t].icon, run: () => this.go(t === 'workflow' ? '#/workflow/new' : '#/new/' + t) })),
+        { label: 'Export to GitHub Copilot / M365 / Claude…', ico: '📦', run: () => this.go('#/export') },
+        { label: 'Check library health', ico: '🩺', run: () => this.go('#/health') },
+        { label: 'View runs', ico: '▶️', run: () => this.go('#/runs') },
+        { label: 'Import files', ico: '📥', run: () => AIC.views.importDialog() },
+        { label: S.mode === 'folder' ? 'Reload from disk' : 'Connect folder', ico: '📁', run: () => S.mode === 'folder' ? S.refresh() : this.connect() },
+        { label: 'Toggle light/dark theme', ico: '🌓', run: () => this.toggleTheme() },
+        { label: 'Guide and best practices', ico: '📖', run: () => this.go('#/guide') },
+        { label: 'Settings', ico: '⚙️', run: () => this.go('#/settings') }
       ];
       let sel = 0; let flat = [];
       const draw = () => {
@@ -213,9 +213,9 @@
             h('span', { style: { width: '22px', textAlign: 'center', fontSize: '16px' } }, x.ico),
             h('div', { class: 'grow' }, h('div', null, x.label), x.sub ? h('div', { class: 'mi-desc', style: { whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' } }, x.sub) : null));
         };
-        if (items.length) results.append(h('div', { class: 'group' }, q ? 'Resultados' : 'Recientes y destacados'), ...flat.slice(0, items.length).map(row));
-        if (acts.length) results.append(h('div', { class: 'group' }, 'Acciones'), ...flat.slice(items.length).map(row));
-        if (!flat.length) results.append(h('div', { class: 'empty' }, 'Sin resultados para «' + inp.value + '»'));
+        if (items.length) results.append(h('div', { class: 'group' }, q ? 'Results' : 'Recent and featured'), ...flat.slice(0, items.length).map(row));
+        if (acts.length) results.append(h('div', { class: 'group' }, 'Actions'), ...flat.slice(items.length).map(row));
+        if (!flat.length) results.append(h('div', { class: 'empty' }, 'No results for «' + inp.value + '»'));
       };
       const mark = () => Array.from(results.querySelectorAll('.menu-item')).forEach((el, i) => el.classList.toggle('sel', i === sel));
       inp.addEventListener('input', () => { sel = 0; draw(); });
@@ -232,5 +232,5 @@
   };
 
   AIC.app = app;
-  document.addEventListener('DOMContentLoaded', () => app.start().catch((e) => { console.error(e); toast('Error al iniciar: ' + e.message, 'err', 6000); }));
+  document.addEventListener('DOMContentLoaded', () => app.start().catch((e) => { console.error(e); toast('Error on startup: ' + e.message, 'err', 6000); }));
 })();

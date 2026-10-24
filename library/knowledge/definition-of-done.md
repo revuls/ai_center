@@ -1,10 +1,10 @@
 ---
 name: Definition of Done
-description: Criterios que una historia debe cumplir para considerarse terminada. Úsalo al implementar, revisar y validar.
+description: Criteria a story must meet to be considered done. Use it when implementing, reviewing and validating.
 icon: ✅
 kind: process
-tags: [proceso, calidad]
-audience: [todos]
+tags: [process, quality]
+audience: [all]
 targets: [any]
 status: stable
 version: "1.0.0"
@@ -12,13 +12,13 @@ author: AI Center
 updated: 2026-10-24
 ---
 
-## Una historia está terminada cuando…
+## A story is done when…
 
-- [ ] Cumple **todos** los criterios de aceptación acordados con el PO.
-- [ ] El código está **revisado** por al menos una persona (o el agente Revisor + una persona).
-- [ ] Tiene **tests automatizados** (unitarios y, si aplica, de integración) en verde en CI.
-- [ ] No introduce **vulnerabilidades** conocidas ni secretos.
-- [ ] La **documentación** relevante está actualizada (README, API, ADR si hubo decisión).
-- [ ] Se ha probado en un entorno de **preproducción**.
-- [ ] Las **métricas/observabilidad** necesarias están en su sitio (logs, trazas, alertas).
-- [ ] El PO ha **aceptado** la historia.
+- [ ] It meets **all** acceptance criteria agreed with the PO.
+- [ ] The code has been **reviewed** by at least one person (or the Reviewer agent + one person).
+- [ ] It has **automated tests** (unit and, where relevant, integration) passing in CI.
+- [ ] It introduces no known **vulnerabilities** or secrets.
+- [ ] Relevant **documentation** is updated (README, API, ADR if a decision was made).
+- [ ] It has been tested in a **pre-production** environment.
+- [ ] The required **metrics/observability** are in place (logs, traces, alerts).
+- [ ] The PO has **accepted** the story.

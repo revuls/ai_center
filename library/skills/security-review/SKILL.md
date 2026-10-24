@@ -1,11 +1,11 @@
 ---
 name: security-review
-description: Analiza diseños o código buscando vulnerabilidades (OWASP Top 10, gestión de secretos, autorización, datos personales) y propone mitigaciones. Úsala en diseños técnicos y PRs sensibles.
+description: Analyzes designs or code looking for vulnerabilities (OWASP Top 10, secret management, authorization, personal data) and proposes mitigations. Use it for technical designs and sensitive PRs.
 metadata:
-  title: Revisión de seguridad
+  title: Security review
   icon: 🛡️
-  tags: seguridad, arquitectura, dev
-  audience: dev, arquitectura
+  tags: security, architecture, dev
+  audience: dev, architecture
   targets: any
   status: stable
   version: "1.0.0"
@@ -13,21 +13,21 @@ metadata:
   updated: 2026-10-24
 ---
 
-# Revisión de seguridad
+# Security review
 
-## Checklist (OWASP Top 10 y más)
-- **Control de acceso**: autorización en servidor, mínimo privilegio, IDOR.
-- **Criptografía**: TLS, cifrado en reposo, nada de algoritmos obsoletos.
-- **Inyección**: SQL/NoSQL/comandos/LDAP; consultas parametrizadas.
-- **Diseño inseguro**: amenazas modeladas (STRIDE) en flujos críticos.
-- **Configuración**: cabeceras, CORS, *debug* desactivado, defaults seguros.
-- **Componentes vulnerables**: dependencias actualizadas, SCA en CI.
-- **Autenticación**: MFA, sesiones, rotación de tokens.
-- **Integridad**: firmas, pipelines protegidos, supply chain.
-- **Logging**: eventos de seguridad registrados, sin datos sensibles.
-- **SSRF** y llamadas salientes controladas.
-- **Secretos**: nunca en código; usa un gestor de secretos.
-- **Datos personales**: minimización, base legal (RGPD), retención.
+## Checklist (OWASP Top 10 and more)
+- **Access control**: server-side authorization, least privilege, IDOR.
+- **Cryptography**: TLS, encryption at rest, no obsolete algorithms.
+- **Injection**: SQL/NoSQL/command/LDAP; parameterized queries.
+- **Insecure design**: threats modeled (STRIDE) for critical flows.
+- **Configuration**: headers, CORS, *debug* disabled, secure defaults.
+- **Vulnerable components**: up-to-date dependencies, SCA in CI.
+- **Authentication**: MFA, sessions, token rotation.
+- **Integrity**: signatures, protected pipelines, supply chain.
+- **Logging**: security events recorded, no sensitive data.
+- **SSRF** and controlled outbound calls.
+- **Secrets**: never in code; use a secret manager.
+- **Personal data**: minimization, legal basis (GDPR), retention.
 
-## Salida
-Tabla de hallazgos con **severidad** (Crítica/Alta/Media/Baja), descripción, impacto y mitigación.
+## Output
+Table of findings with **severity** (Critical/High/Medium/Low), description, impact and mitigation.

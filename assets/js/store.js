@@ -1,18 +1,18 @@
-/* AI Center · store.js — estado y persistencia 100% en ficheros
+/* AI Center · store.js — state and 100% file-based persistence
  *
- * Modos:
- *  - folder : carpeta conectada con File System Access API (Chrome/Edge). Lee y escribe los .md/.json
- *             de /library y regenera library/library.bundle.js en cada cambio.
- *  - bundle : sin carpeta conectada. Se carga library/library.bundle.js (funciona con doble clic, file://).
- *             Los cambios se guardan como borrador en este navegador hasta que conectes la carpeta
- *             o descargues un ZIP.
+ * Modes:
+ *  - folder : folder connected through the File System Access API (Chrome/Edge). Reads and writes the
+ *             .md/.json files in /library and regenerates library/library.bundle.js on every change.
+ *  - bundle : no folder connected. library/library.bundle.js is loaded (works with a double click, file://).
+ *             Changes are kept as drafts in this browser until you connect the folder
+ *             or download a ZIP.
  */
 (function () {
   'use strict';
   const AIC = (window.AIC = window.AIC || {});
   const C = AIC.core;
 
-  /* ---------- IndexedDB mínimo (handles de carpeta y ejecuciones) ---------- */
+  /* ---------- Minimal IndexedDB (folder handles and runs) ---------- */
   const idb = {
     db: null,
     open() {
@@ -46,7 +46,7 @@
     runs() { return this.tx('runs', 'readonly', (s) => s.getAll()).catch(() => []); }
   };
 
-  /* ---------- Preferencias (por usuario/navegador) ---------- */
+  /* ---------- Preferences (per user/browser) ---------- */
   const PREFS_KEY = 'aic.prefs';
   const OVERLAY_KEY = 'aic.overlay';
   const ls = {
@@ -66,8 +66,8 @@
   const store = {
     lib: { config: Object.assign({}, C.DEFAULT_CONFIG), items: [] },
     mode: 'bundle',
-    rootDir: null,      // carpeta elegida por el usuario
-    libDir: null,       // carpeta /library
+    rootDir: null,      // folder chosen by the user
+    libDir: null,       // /library folder
     overlay: ls.get(OVERLAY_KEY, { items: {}, deleted: [] }),
     bundleInfo: null,
     pendingReconnect: null,
@@ -78,7 +78,7 @@
     on(fn) { this.listeners.add(fn); return () => this.listeners.delete(fn); },
     emit(what) { Array.from(this.listeners).forEach((fn) => { try { fn(what); } catch (e) { console.error(e); } }); },
 
-    /* ---------- Carga ---------- */
+    /* ---------- Loading ---------- */
     async init() {
       this.loadFromBundle();
       if (this.fsSupported) {
@@ -88,7 +88,7 @@
             const perm = await handle.queryPermission({ mode: 'readwrite' });
             if (perm === 'granted') { await this.useRoot(handle, { silent: true }); return; }
             this.pendingReconnect = handle;
-          } catch (e) { /* handle inválido */ }
+          } catch (e) { /* invalid handle */ }
         }
       }
       this.emit('load');
@@ -97,7 +97,7 @@
       const b = window.AIC_BUNDLE;
       let lib = { config: Object.assign({}, C.DEFAULT_CONFIG), items: [] };
       if (b && Array.isArray(b.files)) { lib = C.libraryFromFiles(b.files); this.bundleInfo = { generatedAt: b.generatedAt, count: b.files.length }; }
-      // aplica borradores locales
+      // apply local drafts
       const del = new Set(this.overlay.deleted || []);
       lib.items = lib.items.filter((i) => !del.has(keyOf(i)));
       Object.values(this.overlay.items || {}).forEach((it) => {
@@ -113,9 +113,9 @@
     saveOverlay() { ls.set(OVERLAY_KEY, this.overlay); },
     clearOverlay() { this.overlay = { items: {}, deleted: [] }; this.saveOverlay(); },
 
-    /* ---------- Carpeta ---------- */
+    /* ---------- Folder ---------- */
     async connectFolder() {
-      if (!this.fsSupported) throw new Error('Tu navegador no permite escribir en carpetas. Usa Chrome o Edge (o descarga ZIP).');
+      if (!this.fsSupported) throw new Error('Your browser cannot write to folders. Use Chrome or Edge (or download a ZIP).');
       const handle = await window.showDirectoryPicker({ id: 'ai-center', mode: 'readwrite' });
       await this.useRoot(handle);
     },
@@ -123,7 +123,7 @@
       const h = this.pendingReconnect;
       if (!h) return this.connectFolder();
       const perm = await h.requestPermission({ mode: 'readwrite' });
-      if (perm !== 'granted') throw new Error('Permiso denegado');
+      if (perm !== 'granted') throw new Error('Permission denied');
       this.pendingReconnect = null;
       await this.useRoot(h);
     },
@@ -136,13 +136,13 @@
     async useRoot(handle, opts) {
       opts = opts || {};
       let libDir = null; let root = handle;
-      try { libDir = await handle.getDirectoryHandle('library'); } catch (e) { /* no existe */ }
+      try { libDir = await handle.getDirectoryHandle('library'); } catch (e) { /* does not exist */ }
       if (!libDir) {
         const looksLikeLib = await hasAny(handle, ['ai-center.json', 'agents', 'prompts', 'workflows', 'skills']);
         if (looksLikeLib && handle.name === 'library') { libDir = handle; root = handle; }
         else {
           libDir = await handle.getDirectoryHandle('library', { create: true });
-          if (!opts.silent) AIC.toast && AIC.toast('Creada la carpeta library/ en «' + handle.name + '»');
+          if (!opts.silent) AIC.toast && AIC.toast('Created the library/ folder in «' + handle.name + '»');
         }
       }
       this.rootDir = root; this.libDir = libDir;
@@ -155,13 +155,13 @@
       this.lib = lib;
       this.mode = 'folder';
       if (wasEmpty && previous.items.length) {
-        // carpeta nueva → sembrar con lo que había (bundle + borradores)
+        // new folder → seed it with what we had (bundle + drafts)
         this.lib = { config: previous.config, items: previous.items };
         await this.writeAll();
         this.clearOverlay();
-        AIC.toast && AIC.toast('Librería inicializada en la carpeta (' + previous.items.length + ' elementos)', 'ok');
+        AIC.toast && AIC.toast('Library initialized in the folder (' + previous.items.length + ' items)', 'ok');
       } else if (hadChanges && !opts.silent) {
-        const ok = await AIC.confirmDialog(`Tienes ${hadChanges} cambio(s) guardados solo en este navegador. ¿Escribirlos ahora en la carpeta?`, { title: 'Borradores locales', ok: 'Guardar en ficheros' });
+        const ok = await AIC.confirmDialog(`You have ${hadChanges} change(s) saved only in this browser. Write them to the folder now?`, { title: 'Local drafts', ok: 'Save to files' });
         if (ok) {
           for (const it of Object.values(this.overlay.items)) await this.save(C.normalizeItem(it), null, { quiet: true });
           for (const k of this.overlay.deleted) { const [type, id] = k.split(':'); const it = this.get(type, id); if (it) await this.remove(it, { quiet: true }); }
@@ -179,7 +179,7 @@
       this.emit('load');
     },
 
-    /* ---------- Consultas ---------- */
+    /* ---------- Queries ---------- */
     all(type) { return type ? this.lib.items.filter((i) => i.type === type) : this.lib.items; },
     get(type, id) { return this.lib.items.find((i) => i.type === type && i.id === id) || null; },
     index() { return C.indexLib(this.lib); },
@@ -189,7 +189,7 @@
       return id;
     },
 
-    /* ---------- Escritura ---------- */
+    /* ---------- Writing ---------- */
     async save(item, prevKey, opts) {
       opts = opts || {};
       item.updated = C.today();
@@ -232,7 +232,7 @@
           for (const part of p.slice(0, -1)) d = await d.getDirectoryHandle(part);
           await d.removeEntry(p[p.length - 1]);
         }
-      } catch (e) { /* ya no existía */ }
+      } catch (e) { /* already gone */ }
     },
     async saveConfig(cfg) {
       this.lib.config = Object.assign({}, this.lib.config, cfg);
@@ -247,7 +247,7 @@
     async writeBundle() {
       if (this.mode !== 'folder' || !this.libDir) return;
       try { await writeFile(this.libDir, 'library.bundle.js', C.serializeBundle(this.lib)); this.bundleInfo = { generatedAt: new Date().toISOString() }; }
-      catch (e) { console.warn('No se pudo escribir el bundle', e); }
+      catch (e) { console.warn('Could not write the bundle', e); }
     },
     async importFiles(files, opts) {
       opts = opts || {};
@@ -261,7 +261,7 @@
       this.emit('change');
       return n;
     },
-    /** Escribe ficheros arbitrarios (exportaciones) en una carpeta elegida. */
+    /** Writes arbitrary files (exports) into a chosen folder. */
     async writeFilesTo(dirHandle, files) {
       for (const f of files) await writeFile(dirHandle, f.path, f.data !== undefined ? f.data : f.content);
     },
@@ -271,7 +271,7 @@
         try {
           const base = (this.rootDir === this.libDir ? '_runs/' : 'runs/') + run.id;
           await writeFile(this.rootDir, base + '/run.json', JSON.stringify(run, null, 2));
-          await writeFile(this.rootDir, base + '/INFORME.md', report);
+          await writeFile(this.rootDir, base + '/REPORT.md', report);
           return base;
         } catch (e) { console.warn(e); }
       }

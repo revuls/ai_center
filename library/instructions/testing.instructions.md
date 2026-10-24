@@ -1,6 +1,6 @@
 ---
-name: Cómo escribimos tests
-description: "Normas para tests automatizados: estructura AAA, nombres expresivos, aislamiento y cobertura de casos límite."
+name: How we write tests
+description: "Rules for automated tests: AAA structure, expressive names, isolation and edge-case coverage."
 icon: 🧪
 applyTo: "**/*.test.*,**/*.spec.*,**/tests/**,**/__tests__/**"
 tags: [dev, qa, testing]
@@ -12,9 +12,9 @@ author: AI Center
 updated: 2026-10-24
 ---
 
-- Estructura **Arrange / Act / Assert** y un comportamiento por test.
-- Nombre del test = comportamiento esperado: `should <resultado> when <condición>`.
-- Cubre el camino feliz, **casos límite** (vacíos, nulos, máximos) y errores.
-- Tests deterministas: sin dependencias de red, reloj o aleatoriedad (usa *fakes* y *fixtures*).
-- Mocks solo en los bordes del sistema; no mockees lo que estás probando.
-- Si arreglas un bug, añade primero un test que lo reproduzca.
+- **Arrange / Act / Assert** structure and one behavior per test.
+- Test name = expected behavior: `should <result> when <condition>`.
+- Cover the happy path, **edge cases** (empty, null, max values) and errors.
+- Deterministic tests: no network, clock or randomness dependencies (use *fakes* and *fixtures*).
+- Mocks only at the system boundaries; do not mock what you are testing.
+- When fixing a bug, first add a test that reproduces it.

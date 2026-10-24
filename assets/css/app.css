@@ -1,4 +1,4 @@
-/* AI Center · estilos */
+/* AI Center · styles */
 :root {
   --bg: #f6f7fb;
   --bg-elev: #ffffff;
@@ -91,7 +91,7 @@ kbd { font-size: 11px; padding: 1px 6px; border: 1px solid var(--border-strong);
 .page-head p { margin: 4px 0 0; color: var(--text-2); max-width: 760px; }
 .page-head .actions { margin-left: auto; display: flex; gap: 8px; flex-wrap: wrap; }
 
-/* ---------- Controles ---------- */
+/* ---------- Controls ---------- */
 .btn { display: inline-flex; align-items: center; gap: 7px; padding: 7px 13px; border: 1px solid var(--border); background: var(--bg-elev); color: var(--text); border-radius: 9px; font: inherit; font-weight: 560; cursor: pointer; white-space: nowrap; box-shadow: var(--shadow-sm); transition: background .12s, border-color .12s, transform .05s; text-decoration: none !important; }
 .btn:hover { background: var(--bg-hover); border-color: var(--border-strong); }
 .btn:active { transform: translateY(1px); }
@@ -148,7 +148,7 @@ textarea.code { font-family: var(--mono); font-size: 13px; line-height: 1.6; tab
 .multi .opt:hover { border-color: var(--border-strong); }
 .multi .opt.on { background: var(--accent-soft); color: var(--accent-text); border-color: color-mix(in srgb, var(--accent) 45%, transparent); }
 
-/* ---------- Tarjetas ---------- */
+/* ---------- Cards ---------- */
 .card { background: var(--bg-elev); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow-sm); }
 .card-pad { padding: 18px; }
 .grid { display: grid; gap: 14px; }
@@ -271,7 +271,7 @@ textarea.code { font-family: var(--mono); font-size: 13px; line-height: 1.6; tab
 @keyframes pop { from { opacity: 0; transform: scale(.97) translateY(4px); } }
 @keyframes slide { from { opacity: 0; transform: translateY(10px); } }
 
-/* ---------- Paleta de comandos ---------- */
+/* ---------- Command palette ---------- */
 .palette { width: min(640px, 100%); }
 .palette input { border: none !important; box-shadow: none !important; font-size: 16px; padding: 16px 18px; border-bottom: 1px solid var(--border) !important; border-radius: 16px 16px 0 0; }
 .palette .results { max-height: 52vh; overflow: auto; padding: 6px; }

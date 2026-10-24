@@ -1,10 +1,10 @@
 ---
 name: code-review-checklist
-description: "Revisión sistemática de cambios de código: corrección, seguridad, rendimiento, legibilidad y tests, con hallazgos priorizados. Úsala al revisar PRs o diffs."
+description: "Systematic code change review: correctness, security, performance, readability and tests, with prioritized findings. Use it when reviewing PRs or diffs."
 metadata:
-  title: Checklist de revisión de código
+  title: Code review checklist
   icon: 🔍
-  tags: dev, calidad
+  tags: dev, quality
   audience: dev
   targets: copilot, claude, cursor, any
   status: stable
@@ -13,24 +13,24 @@ metadata:
   updated: 2026-10-24
 ---
 
-# Checklist de revisión de código
+# Code review checklist
 
-## Procedimiento
-1. Entiende el **objetivo** del cambio (historia, issue, descripción de la PR).
-2. Revisa en este orden: **corrección → seguridad → datos → rendimiento → diseño → legibilidad → tests**.
-3. Clasifica cada hallazgo: 🔴 **Bloqueante** · 🟠 **Importante** · 🟡 **Sugerencia** · 💬 **Pregunta**.
-4. Para cada hallazgo indica **fichero:línea**, el problema, el porqué y una **propuesta concreta**.
-5. Termina con un **veredicto**: Aprobar / Aprobar con cambios / Cambios necesarios.
+## Procedure
+1. Understand the change's **goal** (story, issue, PR description).
+2. Review in this order: **correctness → security → data → performance → design → readability → tests**.
+3. Classify each finding: 🔴 **Blocker** · 🟠 **Important** · 🟡 **Suggestion** · 💬 **Question**.
+4. For each finding give **file:line**, the problem, the why and a **concrete proposal**.
+5. End with a **verdict**: Approve / Approve with changes / Changes required.
 
-## Qué buscar
-- **Corrección**: lógica, casos límite, nulos, concurrencia, manejo de errores.
-- **Seguridad**: validación de entradas, inyección, autorización, secretos, datos personales en logs.
-- **Datos**: migraciones reversibles, índices, transacciones.
-- **Rendimiento**: N+1, bucles costosos, llamadas en serie que podrían ir en paralelo.
-- **Diseño**: responsabilidades claras, acoplamiento, duplicación.
-- **Legibilidad**: nombres, funciones largas, comentarios que explican el *porqué*.
-- **Tests**: cubren el cambio, son deterministas y legibles.
+## What to look for
+- **Correctness**: logic, edge cases, nulls, concurrency, error handling.
+- **Security**: input validation, injection, authorization, secrets, personal data in logs.
+- **Data**: reversible migrations, indexes, transactions.
+- **Performance**: N+1, expensive loops, serial calls that could run in parallel.
+- **Design**: clear responsibilities, coupling, duplication.
+- **Readability**: names, long functions, comments explaining the *why*.
+- **Tests**: they cover the change, are deterministic and readable.
 
-## Formato de salida
-| Prioridad | Ubicación | Hallazgo | Propuesta |
+## Output format
+| Priority | Location | Finding | Proposal |
 |---|---|---|---|

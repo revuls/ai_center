@@ -1,15 +1,15 @@
 {
-  "name": "Release comunicada",
-  "description": "Prepara una versión: release notes técnicas, comunicado para negocio/clientes e informe ejecutivo, con revisión antes de publicar.",
+  "name": "Announced release",
+  "description": "Prepares a release: technical release notes, an announcement for business/customers and an executive report, with a review before publishing.",
   "icon": "📣",
   "tags": [
-    "producto",
-    "documentacion",
-    "negocio"
+    "product",
+    "documentation",
+    "business"
   ],
   "audience": [
     "po",
-    "negocio",
+    "business",
     "dev"
   ],
   "targets": [
@@ -24,13 +24,13 @@
   "inputs": [
     {
       "name": "version",
-      "label": "Versión",
+      "label": "Version",
       "required": true
     },
     {
-      "name": "cambios",
-      "label": "Cambios incluidos",
-      "description": "Commits, PRs o historias",
+      "name": "changes",
+      "label": "Changes included",
+      "description": "Commits, PRs or stories",
       "required": true
     }
   ],
@@ -38,46 +38,46 @@
     {
       "id": "start",
       "type": "start",
-      "title": "Inicio",
+      "title": "Start",
       "x": 40,
       "y": 200
     },
     {
       "id": "tech",
       "type": "step",
-      "title": "Release notes técnicas",
+      "title": "Technical release notes",
       "agent": "tech-writer",
       "prompt": "release-notes",
       "vars": {
-        "audiencia": "técnico"
+        "audience": "technical"
       },
-      "outputKey": "notas_tecnicas",
+      "outputKey": "technical_notes",
       "x": 260,
       "y": 90
     },
     {
       "id": "biz",
       "type": "step",
-      "title": "Comunicado para negocio",
-      "agent": "asistente-negocio",
+      "title": "Business announcement",
+      "agent": "business-assistant",
       "prompt": "release-notes",
       "vars": {
-        "audiencia": "negocio"
+        "audience": "business"
       },
-      "outputKey": "comunicado",
+      "outputKey": "announcement",
       "x": 260,
       "y": 300
     },
     {
       "id": "exec",
       "type": "step",
-      "title": "Informe ejecutivo",
-      "agent": "asistente-negocio",
-      "prompt": "informe-ejecutivo",
+      "title": "Executive report",
+      "agent": "business-assistant",
+      "prompt": "executive-report",
       "vars": {
-        "tema": "Versión {{version}}",
-        "audiencia": "dirección",
-        "datos": "{{notas_tecnicas}}\n\n{{comunicado}}"
+        "topic": "Version {{version}}",
+        "audience": "leadership",
+        "data": "{{technical_notes}}\n\n{{announcement}}"
       },
       "context": "all",
       "x": 580,
@@ -86,7 +86,7 @@
     {
       "id": "ok",
       "type": "human",
-      "title": "Revisión antes de publicar",
+      "title": "Review before publishing",
       "owner": "Product Owner",
       "x": 880,
       "y": 200
@@ -94,7 +94,7 @@
     {
       "id": "end",
       "type": "end",
-      "title": "Publicar",
+      "title": "Publish",
       "x": 1160,
       "y": 210
     }
@@ -129,13 +129,13 @@
       "id": "l6",
       "from": "ok",
       "to": "end",
-      "label": "aprobado"
+      "label": "approved"
     },
     {
       "id": "l7",
       "from": "ok",
       "to": "exec",
-      "label": "cambios"
+      "label": "changes"
     }
   ]
 }

@@ -1,0 +1,110 @@
+{
+  "name": "From meeting to actions",
+  "description": "Turns a meeting into a summary, an action plan and a ready-to-send follow-up email. Designed for Copilot M365 (Teams and Outlook).",
+  "icon": "🗒️",
+  "tags": [
+    "business",
+    "m365",
+    "meetings"
+  ],
+  "audience": [
+    "business",
+    "po",
+    "all"
+  ],
+  "targets": [
+    "m365",
+    "any"
+  ],
+  "status": "stable",
+  "version": "1.0.0",
+  "author": "AI Center",
+  "updated": "2026-10-24",
+  "inputs": [
+    {
+      "name": "meeting",
+      "label": "Meeting",
+      "description": "Name/date of the Teams meeting, or paste the transcript/notes",
+      "required": true
+    }
+  ],
+  "nodes": [
+    {
+      "id": "start",
+      "type": "start",
+      "title": "Start",
+      "x": 40,
+      "y": 160
+    },
+    {
+      "id": "summary",
+      "type": "step",
+      "title": "Summarize the meeting",
+      "agent": "business-assistant",
+      "prompt": "summarize-meeting",
+      "outputKey": "summary",
+      "x": 260,
+      "y": 140
+    },
+    {
+      "id": "check",
+      "type": "human",
+      "title": "Review actions and owners",
+      "instructions": "Check that actions, owners and dates are correct.",
+      "x": 560,
+      "y": 150
+    },
+    {
+      "id": "email",
+      "type": "step",
+      "title": "Follow-up email",
+      "agent": "business-assistant",
+      "prompt": "executive-email",
+      "vars": {
+        "recipient": "Meeting attendees",
+        "goal": "Share the summary, decisions and actions",
+        "information": "{{summary}}",
+        "tone": "friendly"
+      },
+      "x": 840,
+      "y": 140
+    },
+    {
+      "id": "end",
+      "type": "end",
+      "title": "Ready to send",
+      "deliverable": "Summary + actions + follow-up email",
+      "x": 1130,
+      "y": 150
+    }
+  ],
+  "edges": [
+    {
+      "id": "r1",
+      "from": "start",
+      "to": "summary"
+    },
+    {
+      "id": "r2",
+      "from": "summary",
+      "to": "check"
+    },
+    {
+      "id": "r3",
+      "from": "check",
+      "to": "email",
+      "label": "approved"
+    },
+    {
+      "id": "r4",
+      "from": "check",
+      "to": "summary",
+      "label": "changes"
+    },
+    {
+      "id": "r5",
+      "from": "email",
+      "to": "end"
+    }
+  ]
+}

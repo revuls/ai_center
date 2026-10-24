@@ -1,86 +1,86 @@
 # ✦ AI Center
 
-**El framework del equipo para trabajar con IA.** Guarda en ficheros todo lo que hace que la IA funcione bien en tu contexto —prompts, agentes, skills, instrucciones, conocimiento, herramientas MCP y workflows— y llévalo a **GitHub Copilot**, **Copilot M365**, Claude, Cursor o cualquier IA con un clic.
+**The team framework for working with AI.** Store in files everything that makes AI work well in your context —prompts, agents, skills, instructions, knowledge, MCP tools and workflows— and take it to **GitHub Copilot**, **Copilot M365**, Claude, Cursor or any AI in one click.
 
-- 📁 **100% ficheros** (`.md` con frontmatter y `.json`): versionables en Git, revisables en PR. Sin base de datos.
-- 🖱 **Sin instalación**: abre `index.html` con doble clic. Sin servidor ni dependencias.
-- 🔀 **Workflows visuales**: arrastra agentes, prompts, skills, conocimiento, MCP, revisiones humanas y decisiones a un lienzo.
-- ▶ **Ejecución E2E**: en la app (manual para Copilot M365, APIs o simulación), con la CLI (Copilot CLI, Claude Code, Anthropic, GitHub Models, Azure OpenAI, Ollama) o por un agente (Copilot en modo agente, Copilot coding agent).
-- 📦 **Exportación nativa**: `.github/agents`, `prompts`, `skills`, `instructions`, `copilot-instructions.md`, `.vscode/mcp.json`, `AGENTS.md`, agentes declarativos M365 (manifest + `declarativeAgent.json` + iconos), `.claude/`, `.cursor/`.
-- 🩺 **Gobierno**: validación de calidad, estados (borrador → estable → obsoleto), versionado, detección de secretos y CI.
+- 📁 **100% files** (`.md` with frontmatter and `.json`): versionable in Git, reviewable in PRs. No database.
+- 🖱 **No installation**: open `index.html` with a double click. No server, no dependencies.
+- 🔀 **Visual workflows**: drag agents, prompts, skills, knowledge, MCP, human reviews and decisions onto a canvas.
+- ▶ **E2E execution**: in the app (manual for Copilot M365, APIs or simulation), from the CLI (Copilot CLI, Claude Code, Anthropic, GitHub Models, Azure OpenAI, Ollama) or by an agent (Copilot in agent mode, Copilot coding agent).
+- 📦 **Native export**: `.github/agents`, `prompts`, `skills`, `instructions`, `copilot-instructions.md`, `.vscode/mcp.json`, `AGENTS.md`, M365 declarative agents (manifest + `declarativeAgent.json` + icons), `.claude/`, `.cursor/`.
+- 🩺 **Governance**: quality validation, statuses (draft → stable → deprecated), versioning, secret detection and CI.
 
 ---
 
-## Empezar en 1 minuto
+## Get started in 1 minute
 
-1. Abre **`index.html`** en Chrome o Edge (doble clic).
-2. Pulsa **Conectar carpeta** y elige esta carpeta (la que contiene `library/`). A partir de ahí, cada cambio se guarda en ficheros.
-3. Explora la librería inicial: 8 agentes, 15 prompts, 7 skills, 4 instrucciones, 5 documentos de conocimiento, 5 servidores MCP y 5 workflows.
-4. Abre **Feature de principio a fin** y pulsa **Ejecutar → Simulación** para ver un workflow E2E.
-5. Ve a **Exportar a IAs**, elige *GitHub Copilot* y *Copilot M365* y escribe los ficheros en tu repositorio.
+1. Open **`index.html`** in Chrome or Edge (double click).
+2. Click **Connect folder** and pick this folder (the one containing `library/`). From then on, every change is saved to files.
+3. Browse the starter library: 8 agents, 15 prompts, 7 skills, 4 instructions, 5 knowledge documents, 5 MCP servers and 5 workflows.
+4. Open **Feature end to end** and click **Run → Simulation** to see an E2E workflow.
+5. Go to **Export to AIs**, pick *GitHub Copilot* and *Copilot M365* and write the files into your repository.
 
-> Firefox/Safari: la app funciona en modo lectura; los cambios se guardan como borrador del navegador y puedes descargarlos en ZIP.
+> Firefox/Safari: the app works in read-only mode; changes are kept as browser drafts and you can download them as a ZIP.
 
-## Las piezas
+## The pieces
 
-| | Pieza | Para qué | Fichero |
+| | Piece | What for | File |
 |---|---|---|---|
-| 🔀 | Workflow | Proceso E2E que combina todo + revisiones humanas | `library/workflows/<id>.workflow.json` |
-| 🤖 | Agente | Rol especializado con herramientas, skills, conocimiento y handoffs | `library/agents/<id>.agent.md` |
-| 💬 | Prompt | Plantilla reutilizable con `{{variables}}` | `library/prompts/<id>.prompt.md` |
-| 🧩 | Skill | Procedimiento empaquetado (estándar *Agent Skills*) | `library/skills/<id>/SKILL.md` |
-| 📏 | Instrucción | Normas globales o por ficheros (`applyTo`) | `library/instructions/<id>.instructions.md` |
-| 📚 | Conocimiento | Contexto de negocio y técnico | `library/knowledge/<id>.md` |
-| 🔌 | MCP | Servidores de herramientas | `library/mcp/<id>.mcp.json` |
+| 🔀 | Workflow | E2E process combining everything + human reviews | `library/workflows/<id>.workflow.json` |
+| 🤖 | Agent | Specialized role with tools, skills, knowledge and handoffs | `library/agents/<id>.agent.md` |
+| 💬 | Prompt | Reusable template with `{{variables}}` | `library/prompts/<id>.prompt.md` |
+| 🧩 | Skill | Packaged procedure (*Agent Skills* standard) | `library/skills/<id>/SKILL.md` |
+| 📏 | Instruction | Global or per-file (`applyTo`) rules | `library/instructions/<id>.instructions.md` |
+| 📚 | Knowledge | Business and technical context | `library/knowledge/<id>.md` |
+| 🔌 | MCP | Tool servers | `library/mcp/<id>.mcp.json` |
 
-Especificación completa: [docs/FORMATO.md](docs/FORMATO.md).
+Full specification: [docs/FORMAT.md](docs/FORMAT.md).
 
-## Ejecutar workflows de principio a fin
+## Running workflows end to end
 
-| Dónde | Cómo |
+| Where | How |
 |---|---|
-| **App** | Botón **Ejecutar** → *Manual* (copias/pegas en Copilot M365, Copilot Chat…), *API* (Anthropic, OpenAI‑compatible, Azure) o *Simulación*. Revisiones humanas en pantalla. Informe al final. |
-| **GitHub Copilot (VS Code)** | Exporta y escribe `/wf-<id>` en el chat en modo agente. |
-| **Copilot coding agent** | Asigna un issue: «Ejecuta el workflow de `.github/prompts/wf-<id>.prompt.md` con …». Lee `AGENTS.md`. |
-| **CLI** | `node cli/aic.mjs run <id> --input clave=valor --provider copilot` |
+| **App** | **Run** button → *Manual* (copy/paste into Copilot M365, Copilot Chat…), *API* (Anthropic, OpenAI‑compatible, Azure) or *Simulation*. On-screen human reviews. Report at the end. |
+| **GitHub Copilot (VS Code)** | Export and type `/wf-<id>` in the chat in agent mode. |
+| **Copilot coding agent** | Assign an issue: «Run the workflow in `.github/prompts/wf-<id>.prompt.md` with …». It reads `AGENTS.md`. |
+| **CLI** | `node cli/aic.mjs run <id> --input key=value --provider copilot` |
 
-Proveedores de la CLI: `manual` · `copilot` (Copilot CLI, ejecuta herramientas en tu repo) · `claude-code` · `anthropic` · `github` (GitHub Models) · `openai` · `azure` · `ollama`.
+CLI providers: `manual` · `copilot` (Copilot CLI, runs tools in your repo) · `claude-code` · `anthropic` · `github` (GitHub Models) · `openai` · `azure` · `ollama`.
 
 ## CLI
 
 ```bash
 node cli/aic.mjs help
-node cli/aic.mjs lint                                   # valida (exit 1 si hay errores)
-node cli/aic.mjs bundle                                 # regenera library/library.bundle.js
-node cli/aic.mjs export copilot m365 --out ../mi-repo   # genera ficheros nativos
-node cli/aic.mjs runbook feature-e2e --flavor copilot   # runbook E2E de un workflow
-node cli/aic.mjs run bugfix --input sintomas="…" --provider copilot --cwd ../mi-repo
-node cli/aic.mjs agents-md                              # regenera AGENTS.md de este repo
+node cli/aic.mjs lint                                   # validate (exit 1 on errors)
+node cli/aic.mjs bundle                                 # regenerate library/library.bundle.js
+node cli/aic.mjs export copilot m365 --out ../my-repo   # generate native files
+node cli/aic.mjs runbook feature-e2e --flavor copilot   # E2E runbook of a workflow
+node cli/aic.mjs run bugfix --input symptoms="…" --provider copilot --cwd ../my-repo
+node cli/aic.mjs agents-md                              # regenerate this repo's AGENTS.md
 ```
 
-Requiere Node 18+. Sin dependencias (`npm` no es necesario; `package.json` solo añade atajos).
+Requires Node 18+. No dependencies (`npm` is not needed; `package.json` only adds shortcuts).
 
-## Compartir con el equipo
+## Sharing with the team
 
-- Sube esta carpeta a un **repositorio Git**. Los cambios se proponen por **Pull Request** (el diff es Markdown legible).
-- La app regenera `library/library.bundle.js` automáticamente: quien abra `index.html` **sin conectar carpeta** (p. ej. desde OneDrive/SharePoint) ve la librería actualizada en modo lectura.
-- CI incluida (`.github/workflows/ai-center.yml`): valida la librería y comprueba que el bundle está al día.
+- Push this folder to a **Git repository**. Changes are proposed via **Pull Request** (the diff is readable Markdown).
+- The app regenerates `library/library.bundle.js` automatically: whoever opens `index.html` **without connecting the folder** (e.g. from OneDrive/SharePoint) sees the up-to-date library in read-only mode.
+- CI included (`.github/workflows/ai-center.yml`): validates the library and checks the bundle is up to date.
 
-## Estructura
+## Structure
 
 ```text
-index.html                 ← la app (ábrela con doble clic)
-assets/css, assets/js      ← código de la app (sin dependencias)
-  js/core.js               ← núcleo compartido app + CLI: formato, motor de workflows, exportadores
+index.html                 ← the app (open it with a double click)
+assets/css, assets/js      ← app code (no dependencies)
+  js/core.js               ← core shared by app + CLI: format, workflow engine, exporters
 cli/aic.mjs                ← CLI
-library/                   ← ⭐ tu framework: todo en ficheros
-runs/                      ← informes de ejecuciones (ignorado en Git por defecto)
-docs/FORMATO.md            ← especificación de ficheros
-AGENTS.md                  ← guía para agentes que trabajen en este repo
+library/                   ← ⭐ your framework: everything in files
+runs/                      ← run reports (ignored by Git by default)
+docs/FORMAT.md             ← file specification
+AGENTS.md                  ← guide for agents working in this repo
 ```
 
-## Seguridad
+## Security
 
-- No guardes secretos en ficheros: en MCP usa `${input:NOMBRE}` o variables de entorno (la validación lo detecta).
-- Las claves de API del ejecutor se quedan en tu navegador y solo si marcas *Recordar*.
-- Las revisiones humanas de los workflows son puntos de control obligatorios para agentes.
+- Never store secrets in files: in MCP use `${input:NAME}` or environment variables (validation detects them).
+- The runner's API keys stay in your browser, and only if you tick *Remember*.
+- Workflow human reviews are mandatory checkpoints for agents.

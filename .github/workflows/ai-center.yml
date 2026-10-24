@@ -15,14 +15,14 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-      - name: Validar la librería
+      - name: Validate the library
         run: node cli/aic.mjs lint
-      - name: Comprobar que el bundle está al día
+      - name: Check the bundle is up to date
         run: |
           node cli/aic.mjs bundle
-          # La fecha de generación cambia siempre: se compara sin la línea generatedAt
-          git diff -U0 library/library.bundle.js | grep -E '^[+-][^+-]' | grep -v generatedAt && { echo "::error::Ejecuta 'node cli/aic.mjs bundle' y sube library.bundle.js"; exit 1; } || true
-      - name: Generar exportaciones (artefacto)
+          # The generation date always changes: compare ignoring the generatedAt line
+          git diff -U0 library/library.bundle.js | grep -E '^[+-][^+-]' | grep -v generatedAt && { echo "::error::Run 'node cli/aic.mjs bundle' and commit library.bundle.js"; exit 1; } || true
+      - name: Generate exports (artifact)
         run: node cli/aic.mjs export all --out dist
       - uses: actions/upload-artifact@v4
         with:
