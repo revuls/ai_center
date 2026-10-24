@@ -19,7 +19,75 @@
 4. Open **Feature end to end** and click **Run → Simulation** to see an E2E workflow.
 5. Go to **Export to AIs**, pick *GitHub Copilot* and *Copilot M365* and write the files into your repository.
 
+Ready to make it yours? See [Build your company's library from scratch](#build-your-companys-library-from-scratch).
+
 > Firefox/Safari: the app works in read-only mode; changes are kept as browser drafts and you can download them as a ZIP.
+
+## Build your company's library from scratch
+
+You have two options: **adapt the starter library** (fastest: delete what you don't need and tailor the rest) or **start from an empty library**. To start from scratch:
+
+### 1. Create your repository
+
+Fork or copy this repository into your company's GitHub organization and clone it locally.
+
+### 2. Empty the library
+
+Delete the starter content, keeping only the workspace configuration:
+
+```bash
+cd library && find . -mindepth 1 ! -name 'ai-center.json' -delete && cd ..
+```
+
+Then **regenerate the bundle**. This step matters: if the bundle still contains the starter items, the app will refill the empty folder with them when you connect it.
+
+```bash
+node cli/aic.mjs bundle
+```
+
+### 3. Configure your workspace
+
+Open `index.html`, click **Connect folder** and pick the repository folder. In **Settings**, fill in:
+
+- The workspace name and description.
+- The default target AIs.
+- Organization, website, privacy and terms URLs (only needed if you will publish Copilot M365 agents).
+
+### 4. Create the pieces in this order
+
+Each piece builds on the previous ones:
+
+| Order | Piece | Start with |
+|---|---|---|
+| 1 | 📚 **Knowledge** | Your business glossary, real architecture, Definition of Done, internal processes |
+| 2 | 📏 **Instructions** | One global rule set (language, security, tone), then one per language or technology using `applyTo` |
+| 3 | 🧩 **Skills** | Your "how we do it here": how you write stories, review code, document… |
+| 4 | 🔌 **MCP** | The tools you use: GitHub, Jira, Confluence, internal databases |
+| 5 | 🤖 **Agents** | Your team's roles, linked to their skills, knowledge and tools |
+| 6 | 💬 **Prompts** | The requests your team repeats every week |
+| 7 | 🔀 **Workflows** | Your real processes, combining everything above, with human reviews at the milestones |
+
+Create each item from **+ New**. The **Health** view warns you about broken references, weak descriptions and plain-text secrets.
+
+### 5. Shortcuts
+
+- **Import what you already have**: **+ New → Import files…** brings in prompts, agents and instructions you already use in Copilot (`.github/…`, `.chatmode.md`, `SKILL.md`, Cursor rules). Variables are converted automatically.
+- **Workflows with AI**: **New workflow → Design with AI** — describe the process and Copilot or Claude proposes the flow using your pieces.
+- **Polish existing prompts**: keep the `improve-prompt` prompt before emptying the library and use it to clean up the loose prompts people already have.
+- **From the terminal**: `new` creates items from a template, for example:
+
+```bash
+node cli/aic.mjs new agent "Data Analyst"
+```
+
+### 6. Roll it out to the team
+
+1. Start small: 1 global instruction, 3–4 knowledge documents, 2 agents, 5 prompts and 1 workflow for a process that really hurts.
+2. Validate and export: run `node cli/aic.mjs lint`, then use **Export to AIs** to write the Copilot and M365 files into your product repositories.
+3. Make changes go through Pull Requests, and mark as **Stable** only what has been tested.
+4. Grow it based on what people ask for; **Health** keeps the quality up.
+
+> **Tip:** don't empty everything. Keep `definition-of-done`, `code-review-checklist`, `conventional-commits`, `security-review` and the `workflow-orchestrator` agent — they are generic and work for almost any company — and rewrite the rest with your context. What improves results the most is **knowledge** (a real glossary and architecture): fill that in first.
 
 ## The pieces
 
