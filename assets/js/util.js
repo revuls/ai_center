@@ -256,7 +256,7 @@
   function menu(anchor, items, opts) {
     const p = popover(anchor, items.filter(Boolean).map((it) => it === '-' ? h('div', { style: { height: '1px', background: 'var(--border)', margin: '4px 0' } }) :
       h('button', { class: 'menu-item', onclick: () => { p.close(); it.onClick(); } },
-        it.icon ? (typeof it.icon === 'string' && it.icon.length <= 3 ? h('span', { style: { width: '20px', textAlign: 'center' } }, it.icon) : icon(it.icon)) : null,
+        it.icon ? (P[it.icon] ? icon(it.icon) : h('span', { style: { width: '20px', textAlign: 'center' } }, it.icon)) : null,
         h('div', null, h('div', null, it.label), it.desc ? h('div', { class: 'mi-desc' }, it.desc) : null))), opts);
     return p;
   }

@@ -6,7 +6,7 @@
 window.AIC_BUNDLE = {
  "format": "ai-center-bundle",
  "version": "1.0.0",
- "generatedAt": "2026-10-24T23:36:59.548Z",
+ "generatedAt": "2026-10-24T23:41:31.772Z",
  "files": [
   {
    "path": "ai-center.json",

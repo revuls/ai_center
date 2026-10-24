@@ -59,6 +59,11 @@
       { icon: 'download', label: 'Download .workflow.json', onClick: () => download((wf.id || 'workflow') + '.workflow.json', C.itemToFile(wf).content, 'application/json') },
       { icon: '⌨️', label: 'CLI command to run it', desc: 'node cli/aic.mjs run …', onClick: () => cliModal() }
     ], { align: 'right' }) }, icon('export', 14), h('span', null, 'Export'), icon('chevron', 12));
+    const moreBtn = h('button', { class: 'btn sm icon', title: 'More actions', onclick: () => menu(moreBtn, [
+      { icon: 'dup', label: 'Duplicate workflow', desc: 'Creates an editable copy', onClick: () => duplicateWorkflow() },
+      existing ? '-' : null,
+      existing ? { icon: 'trash', label: 'Delete workflow', desc: S.mode === 'folder' ? 'Deletes library/workflows/' + existing.id + '.workflow.json' : 'Removes it from the library', onClick: () => deleteWorkflow() } : null
+    ], { align: 'right' }) }, icon('menu', 15));
     const top = h('div', { class: 'wf-topbar' },
       h('button', { class: 'btn ghost sm icon', title: 'Show/hide side menu', onclick: () => document.getElementById('shell').classList.toggle('focus') }, icon('menu', 15)),
       h('a', { href: '#/library/workflow', class: 'btn ghost sm' }, '←'),
@@ -71,7 +76,8 @@
       btn('Arrange', () => { commit(); C.autoLayout(wf); render(); fit(); }, { cls: 'sm', icon: 'layout', title: 'Automatic layout' }),
       issuesBtn, exportBtn,
       btn('Run', () => runIt(), { cls: 'sm ok', icon: 'play', title: 'Run the workflow step by step' }),
-      saveBtn);
+      saveBtn,
+      moreBtn);
 
     /* ---------- palette ---------- */
     const palSearch = h('input', { type: 'search', placeholder: 'Search pieces…', oninput: () => drawPalette() });
@@ -628,7 +634,7 @@
         h('div', { class: 'help mono' }, 'library/workflows/' + (wf.id || '…') + '.workflow.json')));
       E.append(inputsEditor());
       E.append(h('div', { class: 'field' }, h('div', { class: 'lbl' }, 'Notas / README'), h('textarea', { rows: 4, value: wf.body || '', oninput: (e) => { wf.body = e.target.value; markDirty(); } })));
-      E.append(h('div', { class: 'callout small' }, '⌨️', h('div', null, h('b', null, 'Atajos: '), 'Del delete · ⌘D duplicate · ⌘Z undo · ⌘S save · double-click the canvas to add a node.')));
+      E.append(h('div', { class: 'callout small' }, '⌨️', h('div', null, h('b', null, 'Shortcuts: '), 'Del delete · ⌘D duplicate · ⌘Z undo · ⌘S save · double-click the canvas to add a node.')));
     }
 
     /* ---------- validation ---------- */
@@ -720,6 +726,20 @@
         if (!existing) { AIC.app.dirty = null; go('#/workflow/' + encodeURIComponent(wf.id)); }
         return true;
       } catch (e) { toast('Error: ' + e.message, 'err'); return false; }
+    }
+    async function duplicateWorkflow() {
+      const c = C.clone(wf);
+      c.id = S.uniqueId('workflow', (wf.name || 'workflow') + ' copy'); c.name = (wf.name || 'Workflow') + ' (copy)'; c.status = 'draft';
+      try { await S.save(c); dirty = false; AIC.app.dirty = null; toast('Duplicated'); go('#/workflow/' + encodeURIComponent(c.id)); }
+      catch (e) { toast('Error: ' + e.message, 'err'); }
+    }
+    async function deleteWorkflow() {
+      const ok = await confirmDialog(h('div', null, 'Delete the workflow «', h('b', null, existing.name), '»? ',
+        S.mode === 'folder' ? h('span', null, 'The file ', h('code', null, 'library/workflows/' + existing.id + '.workflow.json'), ' will be deleted. ') : null,
+        'Its run history is kept.'), { title: 'Delete workflow', danger: true, ok: 'Delete' });
+      if (!ok) return;
+      try { await S.remove(existing); dirty = false; AIC.app.dirty = null; toast('Workflow deleted'); go('#/library/workflow'); }
+      catch (e) { toast('Error: ' + e.message, 'err'); }
     }
     async function runIt() {
       if (dirty || !existing) { if (!(await save())) return; }
