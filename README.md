@@ -112,6 +112,8 @@ Full specification: [docs/FORMAT.md](docs/FORMAT.md).
 | **Copilot coding agent** | Assign an issue: «Run the workflow in `.github/prompts/wf-<id>.prompt.md` with …». It reads `AGENTS.md`. |
 | **CLI** | `node cli/aic.mjs run <id> --input key=value --provider copilot` |
 
+**Files as inputs and context**: workflow inputs can be of type **File(s)** or **Folder** (`{{spec}}` becomes the files' content), and each step can list **📂 Context files** (`src/**/*.ts`, `docs/`, `{{suspects}}`) to read from your repository. The app asks you to pick the files/folder, the CLI reads `--input spec=@path` and the `--cwd` folder, and agents with tools read them directly. Details in [docs/FORMAT.md](docs/FORMAT.md#input-and-context-files).
+
 **Steps that must produce files**: list them in the step's **📄 Output files** field (e.g. `docs/design/{{feature}}.md`). The AI returns each file in a `file=<path>` block; the app lets you download them or write them into your repository, the CLI saves them in `runs/<run>/files/` (add `--write-files <dir>` to write them into a folder), and agents with tools create them directly in the repo. Details in [docs/FORMAT.md](docs/FORMAT.md#output-files).
 
 CLI providers: `manual` · `copilot` (Copilot CLI, runs tools in your repo) · `claude-code` · `anthropic` · `github` (GitHub Models) · `openai` · `azure` · `ollama`.
@@ -126,6 +128,7 @@ node cli/aic.mjs export copilot m365 --out ../my-repo   # generate native files
 node cli/aic.mjs runbook feature-e2e --flavor copilot   # E2E runbook of a workflow
 node cli/aic.mjs run bugfix --input symptoms="…" --provider copilot --cwd ../my-repo
 node cli/aic.mjs run meeting-to-actions --input meeting="…" --provider github --write-files ../my-repo
+node cli/aic.mjs run bugfix --input symptoms="…" --input suspects="src/auth/" --input spec=@docs/spec.md --cwd ../my-repo --provider github
 node cli/aic.mjs agents-md                              # regenerate this repo's AGENTS.md
 ```
 

@@ -52,6 +52,35 @@ function readTree(dir, prefix = '') {
   return out;
 }
 function loadLib() { return C.libraryFromFiles(readTree(LIB_DIR)); }
+/** Relative paths of the text files under `base` (ignored folders skipped). */
+function listFiles(base, prefix = '', out = []) {
+  for (const name of fs.readdirSync(path.join(base, prefix))) {
+    const rel = prefix ? prefix + '/' + name : name;
+    if (C.IGNORED_DIRS.includes(name) || (name.startsWith('.') && !['.github', '.claude', '.cursor', '.gitignore'].includes(name))) continue;
+    const st = fs.statSync(path.join(base, rel));
+    if (st.isDirectory()) listFiles(base, rel, out);
+    else if (C.isTextFile(rel) && st.size < 1024 * 1024) out.push(rel);
+  }
+  return out;
+}
+/** Reads the files under `base` that match the patterns, applying the core limits. */
+function readMatching(base, patterns) {
+  const m = C.matchPaths(listFiles(base), patterns);
+  const lim = C.limitFiles(m.matched.map((p) => ({ path: p, content: fs.readFileSync(path.join(base, p), 'utf8') })));
+  return Object.assign(lim, { unmatched: m.unmatched });
+}
+/** Value for a file/folder input: `@path` (or any value when the input type is file/folder). */
+function readInputPath(raw, input) {
+  const p = path.resolve(String(raw).replace(/^@/, ''));
+  if (!fs.existsSync(p)) die(`Input «${input.name}»: path not found: ${p}`);
+  if (fs.statSync(p).isDirectory()) {
+    const res = readMatching(p, [input.pattern || '**']);
+    if (!res.files.length) die(`Input «${input.name}»: no text files in ${p}${input.pattern ? ' matching ' + input.pattern : ''}`);
+    return C.fileValue(res.files, res);
+  }
+  const rel = path.relative(process.cwd(), p);
+  return C.fileValue([{ path: !rel || rel.startsWith('..') ? path.basename(p) : rel, content: fs.readFileSync(p, 'utf8') }]);
+}
 function writeOut(base, rel, data) {
   const full = path.join(base, rel);
   fs.mkdirSync(path.dirname(full), { recursive: true });
@@ -183,6 +212,9 @@ ${c.b('Usage')}  node cli/aic.mjs <command> [options]
   ${c.cy('run')} <workflow> [--input key=value ...] [--provider p] [--model m] [--auto-approve] [--cwd dir] [--write-files dir]
                                    Run a workflow end to end. Output files go to runs/<run>/files/;
                                    --write-files also writes them into <dir> (e.g. your repository)
+                                   File/folder inputs: --input spec=@docs/spec.md · --input refs=@docs/
+                                   Step context files are read from --context-dir (default --cwd or .);
+                                   agentic providers read them themselves (force with --inline-context)
                                    Providers: manual (default) · copilot (Copilot CLI) · claude-code · anthropic
                                               github (GitHub Models) · openai · azure · ollama
   ${c.cy('new')} <type> "<name>"               Create an item from a template
@@ -258,7 +290,17 @@ async function main() {
       if (errors.length) die('The workflow has errors:\n  ' + errors.map((e) => e.msg).join('\n  '));
       const inputs = {};
       flags.input.forEach((kv) => { const [k, v] = String(kv).split(/=(.*)/s); inputs[k] = v; });
-      for (const i of wf.inputs) if (!inputs[i.name] && i.required) inputs[i.name] = await ask(`${c.cy('?')} ${i.label || i.name}${i.description ? c.dim(' (' + i.description + ')') : ''}: `);
+      for (const i of wf.inputs) {
+        const isPath = i.type === 'file' || i.type === 'folder';
+        if (!inputs[i.name] && i.required) inputs[i.name] = await ask(`${c.cy('?')} ${i.label || i.name}${isPath ? c.dim(' [' + i.type + ' path]') : ''}${i.description ? c.dim(' (' + i.description + ')') : ''}: `);
+        if (inputs[i.name] && (isPath || String(inputs[i.name]).startsWith('@'))) {
+          inputs[i.name] = readInputPath(inputs[i.name], i);
+          console.log(c.dim(`  📎 ${i.name}: ${C.inputText(inputs[i.name])}`));
+        }
+      }
+      for (const k of Object.keys(inputs)) if (typeof inputs[k] === 'string' && inputs[k].startsWith('@') && !wf.inputs.some((i) => i.name === k)) inputs[k] = readInputPath(inputs[k], { name: k });
+      const agentic = ['copilot', 'claude-code'].includes(flags.provider);
+      const ctxBase = path.resolve(flags['context-dir'] || flags.cwd || '.');
       const provider = flags.provider || 'manual';
       const runsDir = path.resolve(flags.runs || path.join(ROOT, 'runs'));
       const stamp = new Date().toISOString().replace(/[:.]/g, '-');
@@ -279,6 +321,11 @@ async function main() {
       let n = 0;
       const run = await C.runWorkflow(lib, wf, inputs, {
         llm: makeLLM(provider, runDir),
+        readFiles: agentic && !flags['inline-context'] ? undefined : async (patterns) => {
+          const res = readMatching(ctxBase, patterns);
+          console.log(c.dim(`    📂 context: ${res.files.length} file(s) from ${path.relative(process.cwd(), ctxBase) || '.'}${res.omitted ? ` (${res.omitted} omitted by limits)` : ''}`));
+          return res;
+        },
         human: async ({ node, context, step }) => {
           console.log(`\n${c.y('🧑 Human review:')} ${c.b(step.title)}${node.owner ? c.dim(' · ' + node.owner) : ''}`);
           if (node.instructions) console.log(c.dim(node.instructions));

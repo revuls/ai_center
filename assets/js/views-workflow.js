@@ -167,6 +167,7 @@
       if (n.type === 'condition' && n.question) chips.push(h('span', { class: 'chip', title: n.question }, '❓ ' + n.question.slice(0, 40)));
       if (n.type === 'human') chips.push(h('span', { class: 'chip' }, '⏸ awaits approval'));
       if (n.outputKey) chips.push(h('span', { class: 'chip accent mono', title: 'Output name' }, '→ {{' + n.outputKey + '}}'));
+      if (C.arr(n.contextFiles).length) chips.push(h('span', { class: 'chip mono', title: 'Context files:\n' + C.arr(n.contextFiles).join('\n') }, '📂 ' + (C.arr(n.contextFiles).length === 1 ? C.arr(n.contextFiles)[0] : C.arr(n.contextFiles).length + ' paths')));
       if (C.arr(n.files).length) chips.push(h('span', { class: 'chip mono', title: C.arr(n.files).join('\n') }, '📄 ' + (C.arr(n.files).length === 1 ? C.arr(n.files)[0] : C.arr(n.files).length + ' files')));
       if (n.type === 'step' && !n.agent && !n.prompt && !n.instructions) chips.push(h('span', { class: 'chip', style: { borderStyle: 'dashed' } }, 'Drop an agent or prompt here'));
       if (chips.length) el.append(h('div', { class: 'n-body' }, ...chips));
@@ -486,6 +487,10 @@
         const ta = target(); if (!ta) return; ta.focus(); ta.setRangeText('{{' + x.t + '}}', ta.selectionStart, ta.selectionEnd, 'end'); ta.dispatchEvent(new Event('input'));
       } }, '{{' + x.t + '}}')));
     }
+    function contextField(n) {
+      const w = V.tagInput(C.arr(n.contextFiles), (v) => { commit(); n.contextFiles = v.length ? v : undefined; refreshNode(); }, { list: true, placeholder: 'src/**/*.ts, docs/ or {{folder}} and press Enter' });
+      return fld('📂 Context files', w, 'Files or folders this step reads as context (relative paths or globs: **, *, {a,b}). The runner attaches their content; agents with tools read them from the repo.');
+    }
     function filesField(n) {
       const w = V.tagInput(C.arr(n.files), (v) => { commit(); n.files = v.length ? v : undefined; refreshNode(); }, { list: true, placeholder: 'docs/{{name}}.md and press Enter' });
       return fld('📄 Output files', w, 'Files this step must produce (relative paths, {{variables}} allowed). The AI returns each one in a `file=<path>` block; runs save them to runs/<run>/files/ and agents write them into the repo.');
@@ -544,6 +549,7 @@
         E.append(fld('📝 Step instructions', instr), tokensHelp(n, () => instr));
         E.append(h('div', { style: { height: '12px' } }));
         E.append(fld('🎁 Expected deliverable', txt(n, 'deliverable', { placeholder: 'e.g. User story in Gherkin format', live: false })));
+        E.append(contextField(n));
         E.append(filesField(n));
         E.append(fld('🧩 Skills', listAttach(n, 'skill')));
         E.append(fld('📚 Knowledge', listAttach(n, 'knowledge')));
@@ -561,6 +567,7 @@
       if (n.type === 'condition') {
         E.append(fld('❓ Decision criterion', txt(n, 'question', { area: true, rows: 3, placeholder: 'Does the story meet INVEST?' })));
         E.append(fld('🤖 Deciding agent (optional)', refSelect('agent', n.agent, (v) => { commit(); n.agent = v || undefined; refreshNode(); })));
+        E.append(contextField(n));
         const outs = wf.edges.filter((e) => e.from === n.id);
         E.append(h('div', { class: 'field' }, h('div', { class: 'lbl' }, 'Options (outputs)'),
           outs.length ? h('div', null, ...outs.map((e) => h('div', { class: 'row', style: { marginBottom: '5px' } },
@@ -570,6 +577,7 @@
       if (n.type === 'end') {
         E.append(fld('Final consolidation (optional)', txt(n, 'instructions', { area: true, rows: 4, placeholder: 'If filled in, an agent will generate the final summary with these instructions.' })));
         E.append(fld('Final deliverable', txt(n, 'deliverable', { placeholder: 'e.g. PR ready for review' })));
+        E.append(contextField(n));
         E.append(filesField(n));
         E.append(fld('🤖 Closing agent (optional)', refSelect('agent', n.agent, (v) => { commit(); n.agent = v || undefined; refreshNode(); })));
       }
@@ -598,9 +606,13 @@
             h('input', { type: 'text', value: inp.label || '', placeholder: 'Label', oninput: (e) => { inp.label = e.target.value; markDirty(); } }),
             h('label', { class: 'check small', title: 'Required' }, h('input', { type: 'checkbox', checked: !!inp.required, onchange: (e) => { inp.required = e.target.checked; markDirty(); } }), '*'),
             h('button', { class: 'btn ghost icon sm', onclick: () => { commit(); wf.inputs.splice(i, 1); inspector(); } }, icon('x', 13))),
+          h('div', { class: 'row', style: { marginBottom: '6px' } },
+            h('select', { title: 'Input type', onchange: (e) => { commit(); inp.type = e.target.value === 'text' ? undefined : e.target.value; inspector(); } },
+              [['text', '✏️ Text'], ['file', '📄 File(s)'], ['folder', '📁 Folder']].map(([v, l]) => h('option', { value: v, selected: (inp.type || 'text') === v }, l))),
+            inp.type === 'folder' ? h('input', { type: 'text', class: 'mono', value: inp.pattern || '', placeholder: 'filter, e.g. **/*.md', title: 'Only files matching this glob', oninput: (e) => { inp.pattern = e.target.value.trim() || undefined; markDirty(); } }) : null),
           h('input', { type: 'text', value: inp.description || '', placeholder: 'Help for whoever fills it in', oninput: (e) => { inp.description = e.target.value; markDirty(); } })));
       });
-      box.append(btn('Add input', () => { commit(); wf.inputs.push({ name: 'entrada_' + (wf.inputs.length + 1), label: '', required: false }); inspector(); }, { cls: 'sm', icon: 'plus' }));
+      box.append(btn('Add input', () => { commit(); wf.inputs.push({ name: 'input_' + (wf.inputs.length + 1), label: '', required: false }); inspector(); }, { cls: 'sm', icon: 'plus' }));
       return box;
     }
     function inspectWorkflow() {

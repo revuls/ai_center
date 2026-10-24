@@ -288,6 +288,35 @@
     });
   }
 
+  /** Lets the user pick files or a folder. Returns [{path, file}] (folder paths are relative to the chosen folder). */
+  function pickLocal(opts) {
+    opts = opts || {};
+    return new Promise((res) => {
+      const inp = h('input', { type: 'file', multiple: true, style: { display: 'none' } });
+      if (opts.folder) { inp.setAttribute('webkitdirectory', ''); inp.setAttribute('directory', ''); }
+      inp.onchange = () => {
+        const out = Array.from(inp.files).map((f) => {
+          let p = (f.webkitRelativePath || f.name).replace(/\\/g, '/');
+          if (opts.folder && p.includes('/')) p = p.slice(p.indexOf('/') + 1);
+          return { path: p, file: f };
+        });
+        inp.remove(); res(out);
+      };
+      document.body.appendChild(inp); inp.click();
+    });
+  }
+  /** Reads the picked text files that match the patterns, applying the core limits. */
+  async function readLocalFiles(entries, patterns) {
+    const C = AIC.core;
+    const byPath = new Map(entries.filter((e) => C.isTextFile(e.path) && e.file.size < 1024 * 1024).map((e) => [e.path, e.file]));
+    const m = C.matchPaths(Array.from(byPath.keys()), patterns && patterns.length ? patterns : ['**']);
+    const files = [];
+    for (const p of m.matched.slice(0, C.FILE_LIMITS.maxFiles + 20)) files.push({ path: p, content: await byPath.get(p).text() });
+    const lim = C.limitFiles(files);
+    lim.omitted += Math.max(0, m.matched.length - files.length);
+    return Object.assign(lim, { unmatched: m.unmatched, total: m.matched.length });
+  }
+
   /* ---------- ZIP (stored, UTF-8) ---------- */
   const CRC = (() => { const t = []; for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
   function crc32(buf) { let c = 0xFFFFFFFF; for (let i = 0; i < buf.length; i++) c = CRC[(c ^ buf[i]) & 0xFF] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; }
@@ -354,5 +383,5 @@
   const typeColor = (t) => `var(--c-${t})`;
   function readTextFileHandle(fh) { return fh.getFile().then((f) => f.text()); }
 
-  Object.assign(AIC, { h, append, $, $$, esc, debounce, icon, btn, md, toast, modal, confirmDialog, promptDialog, popover, menu, copy, download, pickFiles, zip, crc32, iconPng, timeAgo, EMOJIS, typeColor, readTextFileHandle });
+  Object.assign(AIC, { h, append, $, $$, esc, debounce, icon, btn, md, toast, modal, confirmDialog, promptDialog, popover, menu, copy, download, pickFiles, pickLocal, readLocalFiles, zip, crc32, iconPng, timeAgo, EMOJIS, typeColor, readTextFileHandle });
 })();

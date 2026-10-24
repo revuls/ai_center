@@ -98,12 +98,17 @@ Never store secrets: use `${input:NAME}`.
 ```json
 {
   "name": "…", "description": "…",
-  "inputs": [{ "name": "idea", "label": "Idea", "description": "…", "required": true }],
+  "inputs": [
+    { "name": "idea", "label": "Idea", "description": "…", "required": true },
+    { "name": "spec", "label": "Spec", "type": "file" },
+    { "name": "refs", "label": "References", "type": "folder", "pattern": "**/*.md" }
+  ],
   "nodes": [
     { "id": "start", "type": "start", "title": "Start", "x": 40, "y": 200 },
     { "id": "n1", "type": "step", "title": "Refine", "agent": "product-owner", "prompt": "refine-idea",
       "skills": [], "knowledge": [], "mcp": [], "instructions": "Use {{idea}}", "deliverable": "…",
       "outputKey": "stories", "context": "prev", "vars": { "idea": "{{idea}}" },
+      "contextFiles": ["src/**/*.ts", "docs/architecture/"],
       "files": ["docs/stories/{{idea_slug}}.md"], "x": 260, "y": 180 },
     { "id": "h1", "type": "human", "title": "Approval", "owner": "PO", "instructions": "…" },
     { "id": "c1", "type": "condition", "title": "OK?", "question": "…", "agent": "…" },
@@ -123,8 +128,25 @@ Never store secrets: use `${input:NAME}`.
 - **condition**: the AI answers with one of the output labels on its first line; if it does not match, a person is asked.
 - **end**: if it has `instructions`, an agent consolidates the final result.
 - **files** (steps and end): files the step must produce, as relative paths (`{{variables}}` allowed). See *Output files* below.
+- **contextFiles** (steps, decisions and end): files or folders the step reads as context. See *Input and context files* below.
 - Variables: `{{input}}`, `{{outputKey}}`, `{{prev}}`, `{{steps.<id>.output}}`.
 - Limit of 5 iterations per node to avoid infinite loops.
+
+### Input and context files
+
+**File/folder inputs** — an input with `"type": "file"` or `"type": "folder"` (optional `"pattern"` glob to filter a folder) takes files instead of text:
+
+- `{{spec}}` is replaced by the content of the files (each one under a `### path` heading in a fenced block); `{{spec.paths}}` gives the list of paths.
+- If no step references the input, its content is attached to **every** step as *Input files*.
+- **App**: the runner shows *Choose file(s)* / *Choose folder*. **CLI**: `--input spec=@docs/spec.md`, `--input refs=@docs/` (`@` also works for text inputs). **Agents**: the runbook asks for the path and tells them to read it.
+
+**Context files per step** — `contextFiles` lists files, folders (`docs/`) or globs (`src/**/*.ts`, `*.{md,txt}`) relative to a base folder, usually your repository. `{{variables}}` are allowed and a variable may hold several comma-separated paths (e.g. a text input `suspects` = `src/auth/, src/session.ts`); empty variables are ignored.
+
+- **App**: the runner asks for the *Context files folder* (choose your repository); matching files are attached to the step prompt.
+- **CLI**: files are read from `--context-dir` (default `--cwd` or the current folder). Agentic providers (`copilot`, `claude-code`) read the files themselves; force inlining with `--inline-context`.
+- **Agents with tools**: the runbook lists them as *Read first*. Without a folder or reader, the prompt also lists them under *Read these files first*.
+
+Common rules: only text files are read; `.git`, `node_modules`, `dist`, `build`, `vendor`, `.venv`, `runs`… are skipped; paths with `..` or absolute paths are rejected; limits of 60 files, 60,000 characters per file and 240,000 in total (the rest is truncated or omitted and flagged in the prompt). Patterns that match nothing are reported as warnings.
 
 ### Output files
 

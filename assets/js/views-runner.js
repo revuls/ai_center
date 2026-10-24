@@ -56,6 +56,7 @@
     const cfg = Object.assign({ provider: 'manual', model: '', baseUrl: '', apiKey: '', apiVersion: '2024-10-21', remember: false }, S.prefs.llm);
     const inputs = {};
     let autoApprove = false;
+    let workspace = null; // picked folder for step context files: [{path, file}]
     let ctrl = null;
     let running = false;
 
@@ -70,13 +71,44 @@
     page.append(body);
     setup();
 
+    function fileInput(i) {
+      const info = h('div', { class: 'small muted', style: { marginTop: '6px' } }, inputs[i.name] ? C.inputText(inputs[i.name]) : (i.description || 'Nothing selected'));
+      const pick = async (folder) => {
+        const entries = await AIC.pickLocal({ folder });
+        if (!entries.length) return;
+        const res = await AIC.readLocalFiles(entries, [folder ? (i.pattern || '**') : '**']);
+        if (!res.files.length) { toast('No text files found' + (i.pattern ? ' matching ' + i.pattern : ''), 'err'); return; }
+        inputs[i.name] = C.fileValue(res.files, res);
+        info.textContent = '📎 ' + C.inputText(inputs[i.name]) + (res.omitted ? ` · ${res.omitted} omitted by limits` : '');
+      };
+      return h('div', null, h('div', { class: 'row wrap' },
+        i.type === 'folder' ? btn('Choose folder', () => pick(true), { cls: 'sm', icon: 'folder' }) : btn('Choose file(s)', () => pick(false), { cls: 'sm', icon: 'file' }),
+        i.pattern ? h('span', { class: 'chip mono' }, i.pattern) : null,
+        btn('Clear', () => { delete inputs[i.name]; info.textContent = 'Nothing selected'; }, { cls: 'sm ghost' })), info);
+    }
+    function workspaceCard() {
+      const pats = C.uniq(wf.nodes.flatMap((n) => C.arr(n.contextFiles)));
+      const info = h('div', { class: 'small muted', style: { marginTop: '6px' } }, workspace ? `📂 ${workspace.length} files loaded` : 'Not selected: steps will be told to read these paths themselves (fine for agents with tools).');
+      return h('div', { class: 'field', style: { borderTop: '1px solid var(--border)', paddingTop: '12px' } },
+        h('div', { class: 'lbl' }, '📂 Context files folder'),
+        h('div', { class: 'small muted', style: { marginBottom: '6px' } }, 'Some steps read files as context: ', ...pats.map((p) => h('code', { style: { marginRight: '4px' } }, p)), '. Choose the folder they are relative to (usually your repository).'),
+        h('div', { class: 'row' }, btn('Choose folder', async () => {
+          const entries = await AIC.pickLocal({ folder: true });
+          if (!entries.length) return;
+          workspace = entries.filter((e) => !C.isIgnoredPath(e.path));
+          info.textContent = `📂 ${workspace.length} files loaded`;
+        }, { cls: 'sm', icon: 'folder' }), btn('Clear', () => { workspace = null; info.textContent = 'Not selected'; }, { cls: 'sm ghost' })), info);
+    }
+
     function setup() {
       body.innerHTML = '';
       const left = h('div', { class: 'card card-pad' });
       left.append(h('h3', { style: { marginTop: 0 } }, '📥 Inputs'));
       if (!wf.inputs.length) left.append(h('div', { class: 'muted small' }, 'This workflow needs no inputs.'));
       wf.inputs.forEach((i) => left.append(h('div', { class: 'field' }, h('div', { class: 'lbl' }, i.label || i.name, i.required ? h('span', { class: 'req' }, '*') : null, h('span', { class: 'muted mono', style: { fontWeight: 400 } }, '{{' + i.name + '}}')),
-        h('textarea', { rows: 3, placeholder: i.description || '', value: inputs[i.name] || '', oninput: (e) => { inputs[i.name] = e.target.value; } }))));
+        i.type === 'file' || i.type === 'folder' ? fileInput(i)
+          : h('textarea', { rows: 3, placeholder: i.description || '', value: typeof inputs[i.name] === 'string' ? inputs[i.name] : '', oninput: (e) => { inputs[i.name] = e.target.value; } }))));
+      if (wf.nodes.some((n) => C.arr(n.contextFiles).length)) left.append(workspaceCard());
 
       const right = h('div', { class: 'card card-pad' });
       right.append(h('h3', { style: { marginTop: 0 } }, '⚙ Execution engine'));
@@ -109,7 +141,7 @@
     }
 
     async function start() {
-      const missing = wf.inputs.filter((i) => i.required && !String(inputs[i.name] || '').trim());
+      const missing = wf.inputs.filter((i) => i.required && (!inputs[i.name] || (typeof inputs[i.name] === 'string' && !inputs[i.name].trim())));
       if (missing.length) { toast('Missing inputs: ' + missing.map((m) => m.label || m.name).join(', '), 'err'); return; }
       if (['anthropic', 'openai', 'azure'].includes(cfg.provider) && !cfg.apiKey && cfg.provider !== 'openai') { toast('Enter the API key', 'err'); return; }
       Object.assign(S.prefs.llm, cfg); S.savePrefs();
@@ -145,6 +177,7 @@
       const waitUser = () => new Promise((resolve, reject) => { pending = { resolve, reject }; });
 
       const hooks = {
+        readFiles: workspace ? (patterns) => AIC.readLocalFiles(workspace, patterns) : undefined,
         signal: ctrl.signal,
         onEvent: (type, d, run) => {
           liveRun = run;

@@ -88,6 +88,13 @@ A workflow is a **graph** of connected nodes. You design it by dragging pieces o
 - \`{{prev}}\` → result of the connected steps.
 - Each step automatically receives the previous result (configurable: previous / all / none).
 
+## Files as inputs and context
+
+- **File / folder inputs**: in the Start node, set an input's type to *File(s)* or *Folder* (optionally with a filter such as \`**/*.md\`). \`{{name}}\` is replaced by the content of the files; if no step uses it, it is attached to every step.
+- **📂 Context files** of a step: files, folders or globs (\`src/**/*.ts\`, \`docs/\`, \`{{suspects}}\`) the step reads as context.
+- **In the app** the runner asks you to choose the files and the context folder (your repository). **In the CLI** use \`--input spec=@path\` and \`--cwd\` / \`--context-dir\`. **Agents with tools** read them directly from the repository.
+- Only text files are read, heavy folders (\`node_modules\`, \`dist\`, \`.git\`…) are skipped and there are size limits; anything left out is flagged in the prompt.
+
 ## Output files
 
 When a step must produce files, list them in **📄 Output files** (e.g. \`docs/design/{{feature}}.md\`). The AI returns each file in its own block tagged \`file=<path>\`, and:

@@ -769,6 +769,107 @@
   }
 
   /* ------------------------------------------------------------------ *
+   * Input files: files/folders passed to a workflow as inputs ({{name}})
+   * or attached to a step as context (contextFiles: globs / folders).
+   * The core only selects, limits and formats; reading is done by the host
+   * (browser picker, CLI file system) through hooks.readFiles.
+   * ------------------------------------------------------------------ */
+  const FILE_LIMITS = { maxFiles: 60, maxFileChars: 60000, maxTotalChars: 240000 };
+  const IGNORED_DIRS = ['.git', 'node_modules', 'dist', 'build', 'out', 'target', 'vendor', '.next', '.nuxt', '.venv', 'venv', '__pycache__', 'coverage', '.idea', '.vscode-test', 'runs', 'ai-runs'];
+  const TEXT_FILE_RE = /(\.(md|mdx|markdown|txt|rst|adoc|json|jsonc|ya?ml|toml|ini|cfg|conf|properties|env\.example|csv|tsv|xml|html?|css|scss|less|js|jsx|mjs|cjs|ts|tsx|vue|svelte|py|ipynb|java|kt|kts|scala|groovy|gradle|cs|fs|vb|go|rb|php|rs|swift|m|mm|c|h|cc|cpp|hpp|sql|graphql|gql|proto|sh|bash|zsh|ps1|bat|cmd|tf|hcl|bicep|dockerfile|r|dart|lua|pl|ex|exs|erl|clj|elm|hs|ml|feature|http|prisma)|(^|\/)(dockerfile|makefile|readme|license|codeowners|\.gitignore|\.editorconfig))$/i;
+  const isTextFile = (p) => TEXT_FILE_RE.test(String(p));
+  const isIgnoredPath = (p) => String(p).split('/').some((seg) => IGNORED_DIRS.includes(seg));
+  /** Glob → RegExp. Supports **, *, ?, {a,b}. */
+  function globToRegex(glob) {
+    let re = ''; let i = 0;
+    const g = String(glob);
+    while (i < g.length) {
+      const c = g[i];
+      if (c === '*') {
+        if (g[i + 1] === '*') { i += 2; if (g[i] === '/') { i++; re += '(?:.*/)?'; } else re += '.*'; continue; }
+        re += '[^/]*';
+      } else if (c === '?') re += '[^/]';
+      else if (c === '{') { const end = g.indexOf('}', i); if (end > i) { re += '(?:' + g.slice(i + 1, end).split(',').map((x) => x.replace(/[.+^$()|[\]\\]/g, '\\$&').replace(/\*/g, '[^/]*')).join('|') + ')'; i = end + 1; continue; } re += '\\{'; }
+      else re += c.replace(/[.+^$()|[\]\\]/g, '\\$&');
+      i++;
+    }
+    return new RegExp('^' + re + '$');
+  }
+  /** Normalizes a context pattern (relative, no ..). Returns null when unsafe. */
+  function safePattern(p) {
+    const s = String(p || '').trim().replace(/\\/g, '/').replace(/^\.\//, '');
+    if (!s || s === '.' || s === './') return '**';
+    if (/^[a-zA-Z]:/.test(s) || s.startsWith('/') || s.startsWith('~') || s.split('/').includes('..')) return null;
+    return s;
+  }
+  /** Which of `paths` match the patterns. A pattern without wildcards matches that file or everything under that folder. */
+  function matchPaths(paths, patterns) {
+    const pats = arr(patterns).map(safePattern).filter(Boolean);
+    const unmatched = [];
+    const set = new Set();
+    pats.forEach((p) => {
+      const glob = /[*?{]/.test(p);
+      const dir = p.replace(/\/+$/, '');
+      const re = glob ? globToRegex(p) : null;
+      let hit = false;
+      paths.forEach((path) => {
+        if (glob ? re.test(path) : (path === dir || path.startsWith(dir + '/'))) { set.add(path); hit = true; }
+      });
+      if (!hit) unmatched.push(p);
+    });
+    return { matched: Array.from(set).filter((p) => !isIgnoredPath(p)).sort(), unmatched };
+  }
+  /** Applies size limits. files: [{path, content}] */
+  function limitFiles(files, limits) {
+    const L = Object.assign({}, FILE_LIMITS, limits || {});
+    const out = []; let total = 0; let omitted = 0; let truncated = false;
+    files.forEach((f) => {
+      if (out.length >= L.maxFiles || total >= L.maxTotalChars) { omitted++; return; }
+      let content = String(f.content || '');
+      const room = Math.min(L.maxFileChars, L.maxTotalChars - total);
+      if (content.length > room) { content = content.slice(0, room) + '\n… [truncated]'; truncated = true; }
+      total += content.length;
+      out.push({ path: f.path, content });
+    });
+    return { files: out, omitted, truncated: truncated || omitted > 0, chars: total };
+  }
+  const EXT_LANG = { md: 'markdown', mdx: 'markdown', js: 'javascript', mjs: 'javascript', cjs: 'javascript', jsx: 'jsx', ts: 'typescript', tsx: 'tsx', py: 'python', rb: 'ruby', cs: 'csharp', yml: 'yaml', sh: 'bash', ps1: 'powershell', kt: 'kotlin', rs: 'rust' };
+  function langOf(p) { const e = (String(p).split('.').pop() || '').toLowerCase(); return EXT_LANG[e] || (e.length <= 10 ? e : ''); }
+  /** Formats files as Markdown: a heading per file and its content in a 4-backtick block. */
+  function formatFiles(files, info) {
+    const body = files.map((f) => `### \`${f.path}\`\n\n\`\`\`\`${langOf(f.path)}\n${String(f.content).replace(/\n$/, '')}\n\`\`\`\``).join('\n\n');
+    const note = info && (info.omitted || info.truncated) ? `\n\n_⚠ Limited to ${files.length} file(s)${info.omitted ? `, ${info.omitted} omitted` : ''}; some content may be truncated._` : '';
+    return body + note;
+  }
+  /** Value of a file/folder input: renders as the files' content; {{name.paths}} gives the list. */
+  function fileValue(files, info) {
+    const lim = info && info.files ? info : limitFiles(files);
+    return { kind: 'files', output: formatFiles(lim.files, lim), paths: lim.files.map((f) => f.path).join(', '), count: lim.files.length, omitted: lim.omitted || 0 };
+  }
+  const isFileValue = (v) => !!(v && typeof v === 'object' && v.kind === 'files');
+  /** Short text for an input value (file inputs show their paths). */
+  function inputText(v) {
+    if (isFileValue(v)) return `${v.count} file(s): ${String(v.paths).split(', ').slice(0, 12).join(', ')}${v.count > 12 ? ', …' : ''}`;
+    return v === undefined || v === null || v === '' ? '—' : String(v);
+  }
+  /** Context patterns of a node with {{variables}} resolved; a variable may hold several comma/line-separated paths. */
+  function contextPatterns(node, ctx) {
+    return arr(node.contextFiles).flatMap((p) => render(p, ctx || {}, { fallback: '' }).split(/[,\n]+/)).map((p) => p.trim()).filter(Boolean);
+  }
+  /** Names of inputs referenced as {{name}} somewhere in the workflow (instructions, vars, deliverables, prompts). */
+  function referencedNames(lib, wf) {
+    const L = indexLib(lib); const names = new Set();
+    const scan = (t) => extractVars(t).forEach((v) => names.add(v.name.split('.')[0]));
+    (wf.nodes || []).forEach((n) => {
+      scan(n.instructions); scan(n.deliverable); scan(n.question);
+      Object.values(n.vars || {}).forEach(scan);
+      const p = n.prompt && L.get('prompt', n.prompt);
+      if (p) extractVars(p.body).forEach((v) => { if (!(n.vars && n.vars[v.name])) names.add(v.name); });
+    });
+    return names;
+  }
+
+  /* ------------------------------------------------------------------ *
    * Prompt composition for running a step
    * ------------------------------------------------------------------ */
   function resolveNode(lib, node) {
@@ -820,8 +921,20 @@
     usr.push(`# ${wf.name} · ${title}`);
     if (wf.description) usr.push(section('Workflow goal', wf.description));
     const inputs = state.inputs || {};
-    const inLines = (wf.inputs || []).map((i) => inputs[i.name] ? `- **${i.label || i.name}**: ${inputs[i.name]}` : '').filter(Boolean);
+    const inLines = (wf.inputs || []).map((i) => inputs[i.name] ? `- **${i.label || i.name}**: ${inputText(inputs[i.name])}` : '').filter(Boolean);
     if (inLines.length) usr.push(section('Inputs', inLines.join('\n')));
+    const refs = referencedNames(lib, wf);
+    (wf.inputs || []).forEach((i) => {
+      const v = inputs[i.name];
+      if (isFileValue(v) && !refs.has(i.name)) usr.push(section(`Input files: ${i.label || i.name}`, v.output));
+    });
+    const cf = contextPatterns(node, ctx);
+    if (extra.contextFiles && extra.contextFiles.files.length) {
+      usr.push(section('Context files', formatFiles(extra.contextFiles.files, extra.contextFiles) +
+        (extra.contextFiles.unmatched && extra.contextFiles.unmatched.length ? `\n\n_No files matched: ${extra.contextFiles.unmatched.map((p) => '`' + p + '`').join(', ')}_` : '')));
+    } else if (cf.length) {
+      usr.push(section('Read these files first', 'Before starting, read these files/folders from the repository (globs allowed) and use them as context:\n\n' + cf.map((p) => '- `' + p + '`').join('\n')));
+    }
     const mode = node.context || 'prev';
     if (mode !== 'none') {
       const list = mode === 'all'
@@ -894,6 +1007,16 @@
     const nodes = Object.fromEntries((wf.nodes || []).map((n) => [n.id, n]));
     const queue = startNodes(wf).map((n) => n.id);
     const visits = {}; const done = new Set();
+    /** Reads the step's context files through the host (hooks.readFiles). Without a reader, agents are told to read them. */
+    const loadContext = async (node, step) => {
+      const pats = contextPatterns(node, buildContext(wf, node, run));
+      if (!pats.length || !hooks.readFiles) return null;
+      const res = await hooks.readFiles(pats, { node, run });
+      if (!res) return null;
+      step.contextFiles = res.files.map((f) => f.path);
+      if (res.unmatched && res.unmatched.length) emit('warn', { message: `«${step.title}»: no files matched ${res.unmatched.join(', ')}` });
+      return res;
+    };
     const maxVisits = hooks.maxVisits || 5;
     let guard = 0;
     emit('run:start', run);
@@ -917,7 +1040,7 @@
       let next = out[id];
       try {
         if (node.type === 'start') {
-          step.output = (wf.inputs || []).map((i) => `- **${i.label || i.name}**: ${run.inputs[i.name] || '—'}`).join('\n') || 'Workflow start.';
+          step.output = (wf.inputs || []).map((i) => `- **${i.label || i.name}**: ${inputText(run.inputs[i.name])}`).join('\n') || 'Workflow start.';
         } else if (node.type === 'human') {
           const ctx = buildContext(wf, node, run);
           const context = ctx._prevNodes.map((n) => `### ${n.title || nodeLabel(lib, n)}\n\n${run.results[n.id].output || ''}`).join('\n\n');
@@ -934,7 +1057,7 @@
           }
         } else if (node.type === 'condition') {
           const options = out[id].map((e) => e.label || (nodes[e.to] && nodes[e.to].title) || e.to);
-          const composed = composeStep(lib, wf, node, run, { options });
+          const composed = composeStep(lib, wf, node, run, { options, contextFiles: await loadContext(node, step) });
           step.prompt = composed;
           const answer = hooks.llm ? await hooks.llm(composed, { node, step, run, kind: 'condition', options }) : '';
           step.output = answer;
@@ -945,7 +1068,7 @@
           step.decision = chosen ? (chosen.label || (nodes[chosen.to] && nodes[chosen.to].title)) : '';
         } else if (node.type === 'end') {
           if ((node.instructions || hooks.llmOnEnd) && hooks.llm) {
-            const composed = composeStep(lib, wf, Object.assign({}, node, { context: 'all' }), run);
+            const composed = composeStep(lib, wf, Object.assign({}, node, { context: 'all' }), run, { contextFiles: await loadContext(node, step) });
             step.prompt = composed;
             step.output = await hooks.llm(composed, { node, step, run, kind: 'end' });
           } else {
@@ -953,7 +1076,7 @@
           }
           run.final = step.output;
         } else {
-          const composed = composeStep(lib, wf, node, run);
+          const composed = composeStep(lib, wf, node, run, { contextFiles: await loadContext(node, step) });
           step.prompt = composed;
           if (!hooks.llm) throw new Error('No execution engine configured');
           step.output = await hooks.llm(composed, { node, step, run, kind: 'step' });
@@ -997,7 +1120,7 @@
     const lines = [`# Run report · ${run.workflowName}`, '',
       `- **Status**: ${run.status}`, `- **Started**: ${run.startedAt}`, `- **Finished**: ${run.finishedAt || '—'}`, ''];
     const ins = Object.keys(run.inputs || {});
-    if (ins.length) { lines.push('## Inputs', ''); ins.forEach((k) => lines.push(`- **${k}**: ${run.inputs[k]}`)); lines.push(''); }
+    if (ins.length) { lines.push('## Inputs', ''); ins.forEach((k) => lines.push(`- **${k}**: ${inputText(run.inputs[k])}`)); lines.push(''); }
     lines.push('## Steps', '');
     run.steps.forEach((s, i) => {
       lines.push(`### ${i + 1}. ${s.title}${s.attempt > 1 ? ` (attempt ${s.attempt})` : ''}`, '');
@@ -1049,6 +1172,7 @@
       if (n.type === 'condition' && out[n.id].length < 2) add('warn', `${label} is a decision with fewer than 2 outputs.`, n);
       if (n.type === 'condition' && out[n.id].some((e) => !e.label)) add('info', `${label}: label the decision outputs (e.g. «yes» / «no»).`, n);
       arr(n.files).forEach((p) => { if (!safeRelPath(render(p, {}, { fallback: 'x' }))) add('error', `${label}: invalid output file path «${p}» (use a relative path without ..).`, n); });
+      arr(n.contextFiles).forEach((p) => { if (!safePattern(render(p, {}, { fallback: 'x' }))) add('error', `${label}: invalid context path «${p}» (use a relative path or glob without ..).`, n); });
       if (arr(n.files).length && !['step', 'end'].includes(n.type)) add('warn', `${label}: only steps and the end node can produce output files.`, n);
     });
     const back = backEdges(wf);
@@ -1240,7 +1364,8 @@
         const v = flavor === 'copilot' ? '${input:' + i.name + ':' + (i.description || i.label || i.name).replace(/[{}:]/g, ' ') + '}'
           : flavor === 'claude' ? (wf.inputs.length === 1 ? '$ARGUMENTS' : '(ask the user if it is not in $ARGUMENTS)')
             : `[${(i.label || i.name).toUpperCase()}]`;
-        L2.push(`- **${i.label || i.name}**${i.required ? ' (required)' : ''}: ${v}${i.description && flavor !== 'copilot' ? ` — ${i.description}` : ''}`);
+        const kind = i.type === 'file' ? ' (file path — read its content)' : i.type === 'folder' ? ` (folder path — read the files${i.pattern ? ' matching `' + i.pattern + '`' : ''} inside it)` : '';
+        L2.push(`- **${i.label || i.name}**${i.required ? ' (required)' : ''}${kind}: ${v}${i.description && flavor !== 'copilot' ? ` — ${i.description}` : ''}`);
       });
       L2.push('');
     }
@@ -1256,6 +1381,7 @@
       if (r.skills.length) meta.push(`- **Skills**: ${r.skills.map((s) => link(P.skill(s.id), s.name)).join(', ')}`);
       if (r.knowledge.length) meta.push(`- **Knowledge**: ${r.knowledge.map((k) => link(P.knowledge(k.id), k.name)).join(', ')}`);
       if (r.mcp.length) meta.push(`- **Tools**: ${r.mcp.map((m) => '`' + m.id + '`').join(', ')}`);
+      if (arr(n.contextFiles).length) meta.push(`- **Read first**: ${arr(n.contextFiles).map((p) => '`' + p + '`').join(', ')}${arr(n.contextFiles).some((p) => p.includes('{{')) ? ' (`{{name}}` = paths given in that input, if any)' : ''}${flavor === 'm365' ? ' (attach or paste these files)' : ''}`);
       if (n.type !== 'start' && n.type !== 'end' && n.type !== 'human' && flavor !== 'm365') meta.push(`- **Save to**: \`${runDir}/${String(num[n.id]).padStart(2, '0')}-${slugify(t)}.md\``);
       L2.push(meta.join('\n'), '');
       if (n.type === 'start') L2.push('Collect and confirm the inputs. If a required one is missing, ask for it before continuing.', '');
@@ -1556,6 +1682,7 @@
     wfMaps, startNodes, backEdges, linearize, autoLayout, reachable, isReject, nodeLabel,
     resolveNode, composeStep, composeAgent, runWorkflow, runReport, runFiles,
     safeRelPath, nodeFiles, extractFiles,
+    FILE_LIMITS, IGNORED_DIRS, isTextFile, isIgnoredPath, globToRegex, safePattern, matchPaths, limitFiles, formatFiles, fileValue, isFileValue, inputText, referencedNames, contextPatterns,
     lint, validateWorkflow,
     workflowRunbook, agentsMd, mermaid, m365Package, m365Instructions, agentBuilderGuide,
     exportCopilot, exportClaude, exportCursor, exportM365, exportGeneric, exportTargets

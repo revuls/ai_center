@@ -473,8 +473,22 @@
         out.textContent = a ? `${C.composeAgent(S.lib, a)}\n\n---\n\n${body}` : body;
       }
     };
-    const fields = vars.map((v) => h('label', { class: 'field' }, h('div', { class: 'lbl mono' }, v.name),
-      h('textarea', { rows: 2, placeholder: v.placeholder || '', oninput: (e) => { values[v.name] = e.target.value; upd(); } })));
+    const fields = vars.map((v) => {
+      const ta = h('textarea', { rows: 2, placeholder: v.placeholder || '', oninput: (e) => { values[v.name] = e.target.value; upd(); } });
+      const attach = h('button', { class: 'btn ghost sm', title: 'Use the content of files or a folder as the value', onclick: () => menu(attach, [
+        { icon: '📄', label: 'File(s)…', onClick: () => attachFiles(false) },
+        { icon: '📁', label: 'Folder…', onClick: () => attachFiles(true) }
+      ], { align: 'right' }) }, icon('file', 13), h('span', null, 'Attach'));
+      const attachFiles = async (folder) => {
+        const entries = await AIC.pickLocal({ folder });
+        if (!entries.length) return;
+        const res = await AIC.readLocalFiles(entries, ['**']);
+        if (!res.files.length) { toast('No text files found', 'err'); return; }
+        ta.value = C.formatFiles(res.files, res); values[v.name] = ta.value; ta.rows = 8; upd();
+        toast(`📎 ${res.files.length} file(s) attached to ${v.name}`, 'ok');
+      };
+      return h('div', { class: 'field' }, h('div', { class: 'row' }, h('div', { class: 'lbl mono grow' }, v.name), attach), ta);
+    });
     const seg = h('div', { class: 'btn-group', style: { marginBottom: '10px' } });
     [['filled', 'Filled in'], ['m365', 'Copilot M365'], ['copilot', 'Copilot (prompt file)'], ['agent', p.agent ? 'With its agent' : 'Plain text']].forEach(([k, l]) => {
       seg.append(h('button', { class: 'btn sm' + (k === flavor ? ' on' : ''), onclick: (e) => { flavor = k; Array.from(seg.children).forEach((c) => c.classList.remove('on')); e.currentTarget.classList.add('on'); upd(); } }, l));

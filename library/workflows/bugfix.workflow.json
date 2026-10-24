@@ -32,6 +32,19 @@
       "label": "Logs / traces",
       "description": "Optional",
       "required": false
+    },
+    {
+      "name": "suspects",
+      "label": "Suspect files or folders",
+      "description": "Optional: paths or globs to inspect, comma-separated (e.g. src/auth/, src/**/session*.ts)",
+      "required": false
+    },
+    {
+      "name": "spec",
+      "label": "Related spec or ticket",
+      "type": "file",
+      "description": "Optional: the story, ticket export or spec the behavior should follow",
+      "required": false
     }
   ],
   "nodes": [
@@ -50,7 +63,10 @@
       "prompt": "analyze-bug",
       "outputKey": "analysis",
       "x": 260,
-      "y": 180
+      "y": 180,
+      "contextFiles": [
+        "{{suspects}}"
+      ]
     },
     {
       "id": "repro",
@@ -76,7 +92,10 @@
       "instructions": "First write a test that reproduces the bug, apply the minimal fix based on the analysis:\n\n{{analysis}}\n\nand check that all tests pass.",
       "outputKey": "fix",
       "x": 840,
-      "y": 100
+      "y": 100,
+      "contextFiles": [
+        "{{suspects}}"
+      ]
     },
     {
       "id": "review",
