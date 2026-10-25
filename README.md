@@ -96,7 +96,7 @@ node cli/aic.mjs new agent "Data Analyst"
 | 🔀 | Workflow | E2E process combining everything + human reviews | `library/workflows/<id>.workflow.json` |
 | 🤖 | Agent | Specialized role with tools, skills, knowledge and handoffs | `library/agents/<id>.agent.md` |
 | 💬 | Prompt | Reusable template with `{{variables}}` | `library/prompts/<id>.prompt.md` |
-| 🧩 | Skill | Packaged procedure (*Agent Skills* standard) | `library/skills/<id>/SKILL.md` |
+| 🧩 | Skill | Packaged procedure (*Agent Skills* standard) with its scripts, templates, references and assets | `library/skills/<id>/SKILL.md` + any files in that folder |
 | 📏 | Instruction | Global or per-file (`applyTo`) rules | `library/instructions/<id>.instructions.md` |
 | 📚 | Knowledge | Business and technical context | `library/knowledge/<id>.md` |
 | 🔌 | MCP | Tool servers | `library/mcp/<id>.mcp.json` |

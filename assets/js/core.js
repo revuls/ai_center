@@ -499,6 +499,40 @@
   }
 
   /* ------------------------------------------------------------------ *
+   * File contents: text is stored as a string, binary as { b64, size }.
+   * Skill resources (scripts, templates, references, images…) can be either.
+   * ------------------------------------------------------------------ */
+  const RESOURCE_MAX_BYTES = 2 * 1024 * 1024;
+  const isBinary = (c) => !!(c && typeof c === 'object' && typeof c.b64 === 'string');
+  function b64ToBytes(b64) {
+    if (typeof Buffer !== 'undefined') return new Uint8Array(Buffer.from(b64, 'base64'));
+    const bin = atob(b64); const u = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i);
+    return u;
+  }
+  function bytesToB64(bytes) {
+    if (typeof Buffer !== 'undefined') return Buffer.from(bytes).toString('base64');
+    let s = '';
+    for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+    return btoa(s);
+  }
+  /** Stored representation of raw bytes: a string when they are UTF-8 text without NUL bytes, { b64, size } otherwise. */
+  function contentFromBytes(bytes) {
+    const u = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
+    if (!u.subarray(0, 8000).includes(0)) { try { return new TextDecoder('utf-8', { fatal: true }).decode(u); } catch (e) { /* binary */ } }
+    return { b64: bytesToB64(u), size: u.length };
+  }
+  /** Data to write: string for text, Uint8Array for binary. */
+  function contentToData(c) { return isBinary(c) ? b64ToBytes(c.b64) : String(c === undefined || c === null ? '' : c); }
+  function contentSize(c) { return isBinary(c) ? (c.size || Math.floor(c.b64.length * 3 / 4)) : new TextEncoder().encode(String(c || '')).length; }
+  /** Scripts keep their executable bit on export (shebang or shell extension). */
+  const isExecutable = (p, c) => !isBinary(c) && (/^#!/.test(String(c)) || /\.(sh|bash|zsh|command)$/i.test(p));
+  /** Resource files of a skill, placed under `base` (e.g. ".github/skills/<id>/"). */
+  function skillResources(s, base) {
+    return Object.keys(s._files || {}).sort().map((r) => ({ path: base + r, content: s._files[r] }));
+  }
+
+  /* ------------------------------------------------------------------ *
    * Library (virtual file system)
    * ------------------------------------------------------------------ */
   const DEFAULT_CONFIG = { workspace: 'AI Center', description: 'The team framework for working with AI', defaultTargets: ['copilot', 'm365', 'any'] };
@@ -1496,7 +1530,7 @@
     });
     by('skill').forEach((s) => {
       add(P.skill(s.id), fmFile({ name: s.id, description: s.description, license: s.license, 'allowed-tools': s.allowedTools }, s.body));
-      Object.keys(s._files || {}).forEach((r) => add(`.github/skills/${s.id}/${r}`, s._files[r]));
+      skillResources(s, `.github/skills/${s.id}/`).forEach((f) => add(f.path, f.content));
     });
     by('knowledge').forEach((k) => add(P.knowledge(k.id), `# ${k.name}\n\n${k.description ? '> ' + k.description + '\n\n' : ''}${k.body.trim()}\n`));
     const mcps = by('mcp');
@@ -1528,7 +1562,7 @@
     });
     by('skill').forEach((s) => {
       add(P.skill(s.id), fmFile({ name: s.id, description: s.description, license: s.license, 'allowed-tools': s.allowedTools }, s.body));
-      Object.keys(s._files || {}).forEach((r) => add(`.claude/skills/${s.id}/${r}`, s._files[r]));
+      skillResources(s, `.claude/skills/${s.id}/`).forEach((f) => add(f.path, f.content));
     });
     by('knowledge').forEach((k) => add(P.knowledge(k.id), `# ${k.name}\n\n${k.description ? '> ' + k.description + '\n\n' : ''}${k.body.trim()}\n`));
     const mcps = by('mcp');
@@ -1544,7 +1578,12 @@
     const add = (path, content) => files.push({ path, content });
     by('instruction').forEach((i) => add(`.cursor/rules/${i.id}.mdc`, fmFile({ description: i.description, globs: i.global ? undefined : (i.applyTo || '**'), alwaysApply: i.global ? true : false }, i.body)));
     by('agent').forEach((a) => { const path = P.agent(a.id); add(path, fmFile({ description: `${a.name} role: ${a.description}`, alwaysApply: false }, `# ${a.name}\n\n${agentBodyFor(lib, a, 'cursor', path)}`)); });
-    by('skill').forEach((s) => add(P.skill(s.id), fmFile({ description: s.description, alwaysApply: false }, s.body)));
+    by('skill').forEach((s) => {
+      const res = skillResources(s, `.cursor/skills/${s.id}/`);
+      const list = res.length ? '\n\n## Resources\n\n' + res.map((f) => `- [${f.path.split('/').slice(3).join('/')}](${rel(P.skill(s.id), f.path)})`).join('\n') : '';
+      add(P.skill(s.id), fmFile({ description: s.description, alwaysApply: false }, s.body + list));
+      res.forEach((f) => add(f.path, f.content));
+    });
     by('prompt').forEach((p) => add(P.prompt(p.id), convertVars(p.body, 'plain')));
     by('knowledge').forEach((k) => add(P.knowledge(k.id), `# ${k.name}\n\n${k.body.trim()}\n`));
     const mcps = by('mcp');
@@ -1647,7 +1686,10 @@
     const add = (path, content) => files.push({ path, content });
     by('prompt').forEach((p) => add(P.prompt(p.id), `# ${p.name}\n\n> ${p.description}\n\n${convertVars(p.body, 'plain').trim()}\n`));
     by('agent').forEach((a) => add(P.agent(a.id), `# ${a.name} · system prompt\n\n> ${a.description}\n\n${composeAgent(lib, a)}\n`));
-    by('skill').forEach((s) => add(P.skill(s.id), fmFile({ name: s.id, description: s.description }, s.body)));
+    by('skill').forEach((s) => {
+      add(P.skill(s.id), fmFile({ name: s.id, description: s.description }, s.body));
+      skillResources(s, `ai/skills/${s.id}/`).forEach((f) => add(f.path, f.content));
+    });
     by('knowledge').forEach((k) => add(P.knowledge(k.id), `# ${k.name}\n\n${k.body.trim()}\n`));
     by('workflow').forEach((w) => add(P.workflow(w.id), workflowRunbook(lib, w, 'generic')));
     add('AGENTS.md', agentsMd(lib, 'generic', opts));
@@ -1682,6 +1724,7 @@
     wfMaps, startNodes, backEdges, linearize, autoLayout, reachable, isReject, nodeLabel,
     resolveNode, composeStep, composeAgent, runWorkflow, runReport, runFiles,
     safeRelPath, nodeFiles, extractFiles,
+    RESOURCE_MAX_BYTES, isBinary, b64ToBytes, bytesToB64, contentFromBytes, contentToData, contentSize, isExecutable, skillResources,
     FILE_LIMITS, IGNORED_DIRS, isTextFile, isIgnoredPath, globToRegex, safePattern, matchPaths, limitFiles, formatFiles, fileValue, isFileValue, inputText, referencedNames, contextPatterns,
     lint, validateWorkflow,
     workflowRunbook, agentsMd, mermaid, m365Package, m365Instructions, agentBuilderGuide,

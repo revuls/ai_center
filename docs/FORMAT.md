@@ -52,7 +52,14 @@ The body holds the agent instructions (system prompt).
 
 ## 🧩 Skill · `skills/<id>/SKILL.md`
 
-Follows the open **Agent Skills** standard: `name` = id (lowercase with hyphens, ≤ 64), `description` (≤ 1024), optional `license` and `allowed-tools`. AI Center metadata goes in `metadata` (map of strings). Any additional file in the folder (templates, scripts, references) is treated as a skill resource and exported with it.
+Follows the open **Agent Skills** standard: `name` = id (lowercase with hyphens, ≤ 64), `description` (≤ 1024), optional `license` and `allowed-tools`. AI Center metadata goes in `metadata` (map of strings).
+
+**Skill resources** — every other file in the skill folder (`scripts/`, `templates/`, `references/`, `assets/`…) belongs to the skill:
+
+- Any file type: text files are stored as text, binary files (images, PDFs, spreadsheets…) as base64 in `library.bundle.js`. Limit: 2 MB per file (larger files are skipped with a warning). `.DS_Store`, `.git` and `node_modules` are ignored.
+- Exported with the skill to GitHub Copilot (`.github/skills/<id>/`), Claude Code (`.claude/skills/<id>/`), Cursor (`.cursor/skills/<id>/`, linked from the rule) and *Any AI* (`ai/skills/<id>/`). Copilot M365 has no skill folders: the skill text goes into the agent instructions.
+- Scripts with a shebang (`#!`) or a shell extension keep the executable bit when exported from the CLI.
+- In the app, the skill editor's **📎 Skill resources** panel adds files or whole folders, creates and edits text files, downloads and removes them (removed files are deleted from the folder on save). Importing a folder that contains a `SKILL.md` brings all its files.
 
 ```markdown
 ---

@@ -3,3 +3,4 @@ dist/
 ai-runs/
 .DS_Store
 node_modules/
+library/_runs/

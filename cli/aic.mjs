@@ -39,15 +39,22 @@ const c = {
 const die = (msg) => { console.error(c.r('✖ ' + msg)); process.exit(1); };
 
 /* ---------------- files ---------------- */
+/** Reads the library. Every file inside a skill folder is kept (text or binary); elsewhere only text files. */
 function readTree(dir, prefix = '') {
   const out = [];
   if (!fs.existsSync(dir)) return out;
   for (const name of fs.readdirSync(dir)) {
-    if (name.startsWith('.') || name === 'node_modules' || name === 'library.bundle.js') continue;
+    if (name === '.DS_Store' || name === '.git' || name === 'node_modules' || (!prefix && name === 'library.bundle.js')) continue;
+    if (name.startsWith('.') && !/^skills\/[^/]+\//.test(prefix)) continue;
     const full = path.join(dir, name);
     const st = fs.statSync(full);
-    if (st.isDirectory()) out.push(...readTree(full, prefix + name + '/'));
-    else if (st.size < 768 * 1024 && /\.(md|mdc|markdown|txt|json|ya?ml|js|mjs|cjs|ts|py|sh|ps1|csv|html|css|xml|toml|sql)$/i.test(name)) out.push({ path: prefix + name, content: fs.readFileSync(full, 'utf8') });
+    const rel = prefix + name;
+    if (st.isDirectory()) { out.push(...readTree(full, rel + '/')); continue; }
+    const inSkill = /^skills\/[^/]+\/./.test(rel) && !/^skills\/[^/]+\/SKILL\.md$/i.test(rel);
+    if (inSkill) {
+      if (st.size > C.RESOURCE_MAX_BYTES) { console.error(c.y(`⚠ skipped ${rel}: larger than ${C.RESOURCE_MAX_BYTES / 1024 / 1024} MB`)); continue; }
+      out.push({ path: rel, content: C.contentFromBytes(fs.readFileSync(full)) });
+    } else if (st.size < 768 * 1024 && (C.isTextFile(name) || /\.(mdc|ini|bat)$/i.test(name))) out.push({ path: rel, content: fs.readFileSync(full, 'utf8') });
   }
   return out;
 }
@@ -81,10 +88,13 @@ function readInputPath(raw, input) {
   const rel = path.relative(process.cwd(), p);
   return C.fileValue([{ path: !rel || rel.startsWith('..') ? path.basename(p) : rel, content: fs.readFileSync(p, 'utf8') }]);
 }
+/** Writes a file (string, Buffer/Uint8Array or stored { b64 } content); scripts keep their executable bit. */
 function writeOut(base, rel, data) {
   const full = path.join(base, rel);
   fs.mkdirSync(path.dirname(full), { recursive: true });
-  fs.writeFileSync(full, data);
+  const isStored = data && typeof data === 'object' && !(data instanceof Uint8Array);
+  fs.writeFileSync(full, isStored ? C.contentToData(data) : data);
+  if (typeof data === 'string' && C.isExecutable(rel, data)) fs.chmodSync(full, 0o755);
 }
 
 /* ---------------- minimal PNG for M365 icons ---------------- */

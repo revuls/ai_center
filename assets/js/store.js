@@ -197,13 +197,18 @@
       C.normalizeItem(item);
       const key = keyOf(item);
       const prev = prevKey && prevKey !== key ? this.lib.items.find((i) => keyOf(i) === prevKey) : null;
+      const before = this.lib.items.find((i) => keyOf(i) === (prevKey || key));
+      const oldFiles = before && before.type === 'skill' && before.id === item.id ? Object.keys(before._files || {}) : [];
       const idx = this.lib.items.findIndex((i) => keyOf(i) === (prevKey || key));
       if (idx >= 0) this.lib.items[idx] = item; else this.lib.items.push(item);
       if (prev && prev !== item) this.lib.items = this.lib.items.filter((i) => i !== prev);
       if (this.mode === 'folder') {
         if (prevKey && prevKey !== key) await this.deleteFiles(prevKey);
         await writeFile(this.libDir, C.pathFor(item), C.itemToFile(item).content);
-        if (item.type === 'skill' && item._files) for (const r of Object.keys(item._files)) await writeFile(this.libDir, `skills/${item.id}/${r}`, item._files[r]);
+        if (item.type === 'skill') {
+          for (const r of Object.keys(item._files || {})) await writeFile(this.libDir, `skills/${item.id}/${r}`, item._files[r]);
+          for (const r of oldFiles) if (!(item._files && r in item._files)) await removeFile(this.libDir, `skills/${item.id}/${r}`);
+        }
         this.scheduleBundle();
       } else {
         if (prevKey && prevKey !== key) { delete this.overlay.items[prevKey]; this.overlay.deleted = C.uniq([...(this.overlay.deleted || []), prevKey]); }
@@ -301,18 +306,30 @@
     }
     return false;
   }
+  /** Reads the library. Every file inside a skill folder is kept (text or binary); elsewhere only text files. */
   async function readTree(dir, prefix) {
     const out = [];
     for await (const [name, h] of dir.entries()) {
-      if (name.startsWith('.') || name === 'node_modules' || name === 'library.bundle.js') continue;
+      if (name === '.DS_Store' || name === '.git' || name === 'node_modules' || (!prefix && name === 'library.bundle.js')) continue;
+      if (name.startsWith('.') && !/^skills\/[^/]+\//.test(prefix)) continue;
       const p = prefix + name;
-      if (h.kind === 'directory') out.push(...await readTree(h, p + '/'));
-      else if (TEXT_EXT.test(name) || /SKILL\.md$/.test(name)) {
-        const f = await h.getFile();
-        if (f.size < 768 * 1024) out.push({ path: p, content: await f.text() });
-      }
+      if (h.kind === 'directory') { out.push(...await readTree(h, p + '/')); continue; }
+      const inSkill = /^skills\/[^/]+\/./.test(p) && !/^skills\/[^/]+\/SKILL\.md$/i.test(p);
+      const f = await h.getFile();
+      if (inSkill) {
+        if (f.size > C.RESOURCE_MAX_BYTES) { console.warn('Skipped (too large):', p); continue; }
+        out.push({ path: p, content: C.contentFromBytes(new Uint8Array(await f.arrayBuffer())) });
+      } else if ((TEXT_EXT.test(name) || /SKILL\.md$/.test(name)) && f.size < 768 * 1024) out.push({ path: p, content: await f.text() });
     }
     return out;
+  }
+  async function removeFile(dir, path) {
+    const parts = path.split('/').filter(Boolean);
+    try {
+      let d = dir;
+      for (const p of parts.slice(0, -1)) d = await d.getDirectoryHandle(p);
+      await d.removeEntry(parts[parts.length - 1]);
+    } catch (e) { /* already gone */ }
   }
   async function writeFile(dir, path, data) {
     const parts = path.split('/').filter(Boolean);
@@ -320,7 +337,7 @@
     for (const p of parts.slice(0, -1)) d = await d.getDirectoryHandle(p, { create: true });
     const fh = await d.getFileHandle(parts[parts.length - 1], { create: true });
     const w = await fh.createWritable();
-    await w.write(data);
+    await w.write(data && typeof data === 'object' && C.isBinary(data) ? C.contentToData(data) : data);
     await w.close();
   }
 

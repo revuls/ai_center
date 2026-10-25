@@ -297,7 +297,7 @@
       inp.onchange = () => {
         const out = Array.from(inp.files).map((f) => {
           let p = (f.webkitRelativePath || f.name).replace(/\\/g, '/');
-          if (opts.folder && p.includes('/')) p = p.slice(p.indexOf('/') + 1);
+          if (opts.folder && !opts.keepRoot && p.includes('/')) p = p.slice(p.indexOf('/') + 1);
           return { path: p, file: f };
         });
         inp.remove(); res(out);

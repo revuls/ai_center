@@ -31,7 +31,7 @@
     const out = [];
     for (const f of files) {
       if (f.icon) out.push({ path: f.path, data: await AIC.iconPng(f.icon) });
-      else out.push({ path: f.path, data: f.content });
+      else out.push({ path: f.path, data: C.contentToData(f.content) });
     }
     return out;
   }
@@ -66,7 +66,7 @@
     const how = h('div');
     const tree = h('div', { class: 'card card-pad tree' });
     const code = h('pre', { class: 'code-view', style: { minHeight: '420px' } });
-    const codeWrap = h('div', { class: 'prompt-box' }, code, h('button', { class: 'btn sm copy', onclick: () => { const f = files[st.sel]; if (f && f.content) copy(f.content); } }, icon('copy', 13), h('span', null, 'Copy')));
+    const codeWrap = h('div', { class: 'prompt-box' }, code, h('button', { class: 'btn sm copy', onclick: () => { const f = files[st.sel]; if (f && typeof f.content === 'string') copy(f.content); } }, icon('copy', 13), h('span', null, 'Copy')));
     page.append(how, h('div', { class: 'grid', style: { gridTemplateColumns: '340px 1fr', alignItems: 'start' } }, tree, codeWrap));
     root.append(page);
     let files = [];
@@ -106,7 +106,7 @@
       });
       st.sel = Math.min(st.sel, files.length - 1);
       const f = files[st.sel];
-      code.textContent = f.icon ? `(PNG icon ${f.icon.size}×${f.icon.size} generated automatically)` : f.content;
+      code.textContent = f.icon ? `(PNG icon ${f.icon.size}×${f.icon.size} generated automatically)` : C.isBinary(f.content) ? `(binary file · ${Math.ceil(C.contentSize(f.content) / 1024)} KB — included in the export as is)` : f.content;
     }
     async function writeFolder() {
       if (!files.length) return;
@@ -189,7 +189,7 @@
   };
 
   V.downloadLibraryZip = function () {
-    const files = C.libraryToFiles(S.lib).map((f) => ({ path: 'library/' + f.path, data: f.content }));
+    const files = C.libraryToFiles(S.lib).map((f) => ({ path: 'library/' + f.path, data: C.contentToData(f.content) }));
     files.push({ path: 'library/library.bundle.js', data: C.serializeBundle(S.lib) });
     download(`ai-center-library-${C.today()}.zip`, AIC.zip(files));
     toast('Unzip it over the framework folder (replaces library/)', 'ok', 4500);
@@ -217,6 +217,28 @@
     }
     return { path: p, content };
   }
+  /** Maps imported files to library paths. Every file inside a folder that contains a SKILL.md travels with that skill. */
+  function normalizeAll(raw, defaultType) {
+    const roots = raw.filter((f) => !f.keep && /(^|\/)SKILL\.md$/i.test((f.path || f.name).replace(/\\/g, '/')))
+      .map((f) => {
+        const p = (f.path || f.name).replace(/\\/g, '/');
+        const root = p.replace(/\/?SKILL\.md$/i, '');
+        const fmName = typeof f.content === 'string' ? C.parseFrontmatter(f.content).data.name : '';
+        return { root, id: C.slugify(root ? root.split('/').pop() : (fmName || 'imported-skill')) };
+      })
+      .sort((a, b) => b.root.length - a.root.length);
+    return raw.map((f) => {
+      if (f.keep) return f;
+      const p = (f.path || f.name).replace(/\\/g, '/');
+      const r = roots.find((x) => x.root === '' ? /^SKILL\.md$/i.test(p) : p.startsWith(x.root + '/'));
+      if (r) return { path: `skills/${r.id}/${r.root ? p.slice(r.root.length + 1) : p}`, content: f.content };
+      return typeof f.content === 'string' ? normalizeImported(f, defaultType) : null;
+    }).filter(Boolean);
+  }
+  async function readImported(file, path) {
+    if (file.size > C.RESOURCE_MAX_BYTES) return null;
+    return { name: file.name, path, content: C.contentFromBytes(new Uint8Array(await file.arrayBuffer())) };
+  }
   V.importDialog = function () {
     let staged = [];
     let defType = 'knowledge';
@@ -224,9 +246,12 @@
     const dz = h('div', { class: 'dropzone' }, h('div', { style: { fontSize: '30px' } }, '📥'), h('div', null, 'Drop files or folders here'),
       h('div', { class: 'small', style: { marginTop: '4px' } }, '.prompt.md · .agent.md · .chatmode.md · .instructions.md · SKILL.md · .mdc · .workflow.json · .mcp.json · library.bundle.js · copias JSON'),
       h('div', { class: 'row', style: { justifyContent: 'center', marginTop: '10px' } },
-        btn('Choose files', async () => addFiles(await AIC.pickFiles('.md,.mdc,.json,.js,.txt', true)), { cls: 'sm' }),
+        btn('Choose files', async () => {
+          const entries = await AIC.pickLocal({ folder: false });
+          addFiles((await Promise.all(entries.map((e) => readImported(e.file, e.path)))).filter(Boolean));
+        }, { cls: 'sm' }),
         btn('Choose folder', async () => {
-          if (S.fsSupported) { try { const d = await window.showDirectoryPicker({ id: 'aic-import' }); addFiles(await readDir(d, '')); } catch (e) { /* cancel */ } }
+          if (S.fsSupported) { try { const d = await window.showDirectoryPicker({ id: 'aic-import' }); addFiles(await readDir(d, d.name + '/')); } catch (e) { /* cancel */ } }
           else toast('Use Chrome/Edge to import folders', 'err');
         }, { cls: 'sm' })));
     dz.addEventListener('dragover', (e) => { e.preventDefault(); dz.classList.add('hover'); });
@@ -245,6 +270,7 @@
     let raw = [];
     function addFiles(files) {
       files.forEach((f) => {
+        if (typeof f.content !== 'string') { raw.push(f); return; }
         if (/\.js$/i.test(f.name || f.path) && /AIC_BUNDLE/.test(f.content)) { try { C.parseBundle(f.content).files.forEach((x) => raw.push({ path: x.path, content: x.content, keep: true })); } catch (e) { toast('Invalid bundle', 'err'); } return; }
         if (/\.json$/i.test(f.name || f.path) && /"ai-center-(bundle|backup)"/.test(f.content)) { try { JSON.parse(f.content).files.forEach((x) => raw.push({ path: x.path, content: x.content, keep: true })); } catch (e) { /* */ } return; }
         raw.push(f);
@@ -252,13 +278,14 @@
       redraw();
     }
     function redraw() {
-      staged = raw.map((f) => f.keep ? f : normalizeImported(f, defType));
+      staged = normalizeAll(raw, defType);
       const lib = C.libraryFromFiles(staged);
       list.innerHTML = '';
       if (!lib.items.length) { if (raw.length) list.append(h('div', { class: 'muted small' }, 'No items recognized.')); return; }
       list.append(h('div', { class: 'small muted', style: { marginBottom: '6px' } }, lib.items.length + ' items detected'));
       lib.items.forEach((it) => list.append(h('div', { class: 'row small', style: { padding: '4px 0', borderBottom: '1px solid var(--border)' } },
         h('span', { class: 'chip type', style: { background: typeColor(it.type) } }, C.TYPES[it.type].singular), h('b', null, it.name), h('span', { class: 'muted mono' }, it.id),
+        it._files && Object.keys(it._files).length ? h('span', { class: 'chip', title: Object.keys(it._files).join('\n') }, '📎 ' + Object.keys(it._files).length + ' resource(s)') : null,
         S.get(it.type, it.id) ? h('span', { class: 'chip st-draft' }, 'overwrites') : h('span', { class: 'chip st-stable' }, 'new'))));
     }
     modal({
@@ -275,17 +302,18 @@
   async function readDir(dir, prefix) {
     const out = [];
     for await (const [name, hd] of dir.entries()) {
-      if (name.startsWith('.') && !['.github', '.claude', '.cursor'].includes(name)) continue;
-      if (name === 'node_modules') continue;
+      if (name === '.DS_Store' || name === '.git' || name === 'node_modules') continue;
+      if (hd.kind === 'directory' && C.IGNORED_DIRS.includes(name)) continue;
       if (hd.kind === 'directory') out.push(...await readDir(hd, prefix + name + '/'));
-      else if (/\.(md|mdc|json|js)$/i.test(name)) { const f = await hd.getFile(); if (f.size < 768 * 1024) out.push({ name, path: prefix + name, content: await f.text() }); }
+      else { const r = await readImported(await hd.getFile(), prefix + name); if (r) out.push(r); }
     }
     return out;
   }
   function readEntry(entry, prefix) {
     return new Promise((res) => {
-      if (entry.isFile) entry.file(async (f) => res(/\.(md|mdc|json|js)$/i.test(f.name) ? [{ name: f.name, path: prefix + f.name, content: await f.text() }] : []), () => res([]));
+      if (entry.isFile) entry.file(async (f) => { const r = f.name === '.DS_Store' ? null : await readImported(f, prefix + f.name); res(r ? [r] : []); }, () => res([]));
       else if (entry.isDirectory) {
+        if (['.git', 'node_modules'].includes(entry.name)) { res([]); return; }
         const reader = entry.createReader(); const all = [];
         const read = () => reader.readEntries(async (ents) => {
           if (!ents.length) { const nested = await Promise.all(all.map((e) => readEntry(e, prefix + entry.name + '/'))); res(nested.flat()); return; }

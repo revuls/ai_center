@@ -270,7 +270,7 @@
     const existing = id ? S.get(type, id) : null;
     if (id && !existing) { root.append(h('div', { class: 'page' }, h('div', { class: 'card empty' }, h('div', { class: 'e-ico' }, '🔎'), 'No existe ', h('code', null, type + ':' + id), h('div', { style: { marginTop: '10px' } }, btn('Back', () => go('#/library/' + type)))))); return; }
     let draft = existing ? C.clone(existing) : C.newItem(type, { body: TEMPLATES[type] || '', author: S.prefs.author, targets: (S.lib.config.defaultTargets || []).slice() });
-    if (existing && existing._files) draft._files = existing._files;
+    if (existing && existing._files) draft._files = Object.assign({}, existing._files);
     const prevKey = existing ? S.keyOf(existing) : null;
     let dirty = false; let idTouched = !!existing;
     const T = C.TYPES[type];
@@ -293,7 +293,7 @@
       try {
         const files = draft._files;
         const copyIt = C.clone(Object.assign({}, draft, { _files: undefined }));
-        if (files) copyIt._files = files;
+        if (files) copyIt._files = Object.assign({}, files);
         const saved = await S.save(copyIt, prevKey);
         dirty = false;
         toast(S.mode === 'folder' ? '💾 Saved to library/' + C.pathFor(saved) : 'Saved in this browser (connect the folder to write files)', 'ok');
@@ -392,10 +392,10 @@
     const bodyCard = h('div', { class: 'card body-card' }, tabs, ta, preview, outPrev);
 
     const side = h('div', { class: 'col', style: { gap: '14px' } }, bodyCard);
+    if (type === 'skill') side.append(resourcesCard(draft, markDirty));
     if (existing) {
       const used = C.usagesOf(S.lib, type, existing.id);
       if (used.length) side.append(h('div', { class: 'card card-pad' }, h('div', { style: { fontWeight: 700, marginBottom: '8px' } }, '🔗 Used in'), h('div', { class: 'chips' }, ...used.map((u) => h('a', { href: '#', class: 'chip', onclick: (e) => { e.preventDefault(); AIC.app.openItem(u); } }, (u.icon || C.TYPES[u.type].icon) + ' ' + u.name)))));
-      if (type === 'skill' && existing._files && Object.keys(existing._files).length) side.append(h('div', { class: 'card card-pad' }, h('div', { style: { fontWeight: 700, marginBottom: '8px' } }, '📎 Skill resources'), ...Object.keys(existing._files).map((r) => h('div', { class: 'mono small' }, '• ' + r))));
       const issues = C.lint({ config: S.lib.config, items: [existing, ...S.lib.items.filter((i) => i !== existing)] }).filter((i) => i.type === type && i.id === existing.id);
       if (issues.length) side.append(h('div', { class: 'card card-pad' }, h('div', { style: { fontWeight: 700, marginBottom: '6px' } }, '🩺 Quality'), ...issues.map((i) => h('div', { class: 'row small', style: { alignItems: 'flex-start', marginBottom: '4px' } }, h('span', { class: 'lvl ' + i.level, style: { width: '8px', height: '8px', borderRadius: '50%', marginTop: '6px', flex: 'none' } }), i.msg))));
     }
@@ -408,6 +408,74 @@
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
   };
+
+  /* Skill resources: every file in the skill folder (scripts, templates, references, assets…) */
+  const fmtSize = (n) => n < 1024 ? n + ' B' : n < 1048576 ? (n / 1024).toFixed(1) + ' KB' : (n / 1048576).toFixed(1) + ' MB';
+  function resourcesCard(draft, markDirty) {
+    draft._files = draft._files || {};
+    const box = h('div', { class: 'card card-pad' });
+    const changed = () => { markDirty(); draw(); };
+    const put = (path, content) => {
+      const p = C.safeRelPath(path);
+      if (!p || /^SKILL\.md$/i.test(p)) { toast('Invalid path: ' + path, 'err'); return false; }
+      draft._files[p] = content; return true;
+    };
+    const addFiles = async (folder) => {
+      const entries = await AIC.pickLocal({ folder, keepRoot: true });
+      if (!entries.length) return;
+      let base = '';
+      if (!folder) {
+        const v = await AIC.promptDialog('Folder inside the skill', 'references/', { help: 'Where to put the file(s), e.g. scripts/, templates/, references/, assets/. Leave empty for the skill root.' });
+        if (v === null) return;
+        base = v.trim().replace(/^\/+|\/+$/g, '');
+        base = base ? base + '/' : '';
+      }
+      let n = 0; const skipped = [];
+      for (const e of entries) {
+        if (e.path.split('/').some((seg) => seg === '.DS_Store' || seg === '.git' || seg === 'node_modules')) continue;
+        if (e.file.size > C.RESOURCE_MAX_BYTES) { skipped.push(e.path); continue; }
+        if (put(base + e.path, C.contentFromBytes(new Uint8Array(await e.file.arrayBuffer())))) n++;
+      }
+      if (skipped.length) toast(`Skipped (larger than ${C.RESOURCE_MAX_BYTES / 1048576} MB): ${skipped.join(', ')}`, 'err', 6000);
+      if (n) { toast(`📎 ${n} file(s) added — remember to save`, 'ok'); changed(); }
+    };
+    const editFile = (p) => {
+      const ta = h('textarea', { class: 'code', rows: 22, spellcheck: 'false', value: draft._files[p] });
+      modal({
+        title: p, titleIcon: '📄', size: 'wide', body: ta,
+        foot: (close) => [btn('Cancel', () => close(), { cls: 'ghost' }), btn('Apply', () => { draft._files[p] = ta.value; close(); changed(); }, { cls: 'primary', icon: 'check' })]
+      });
+    };
+    const newFile = async () => {
+      const v = await AIC.promptDialog('New text file', 'templates/new-template.md', { help: 'Path inside the skill folder.' });
+      if (!v) return;
+      const p = C.safeRelPath(v);
+      if (p && draft._files[p] !== undefined) { toast('That file already exists', 'err'); return; }
+      if (put(v, '')) { changed(); editFile(p); }
+    };
+    const addBtn = h('button', { class: 'btn sm', onclick: () => menu(addBtn, [
+      { icon: '📄', label: 'Add file(s)…', desc: 'Into a folder of the skill', onClick: () => addFiles(false) },
+      { icon: '📁', label: 'Add folder…', desc: 'Keeps its name and structure', onClick: () => addFiles(true) },
+      { icon: '✏️', label: 'New text file…', desc: 'e.g. templates/report.md', onClick: () => newFile() }
+    ], { align: 'right' }) }, icon('plus', 13), h('span', null, 'Add'));
+    function draw() {
+      box.innerHTML = '';
+      const paths = Object.keys(draft._files).sort();
+      box.append(h('div', { class: 'row wrap', style: { marginBottom: '8px' } }, h('b', null, '📎 Skill resources'),
+        h('span', { class: 'muted small' }, paths.length ? `${paths.length} file(s)` : ''), h('div', { class: 'grow' }), addBtn));
+      if (!paths.length) box.append(h('div', { class: 'muted small' }, 'Scripts, templates, references, images… Every file in the skill folder travels with it on export (GitHub Copilot, Claude Code, Cursor, any AI).'));
+      box.append(h('div', { class: 'attach-list' }, ...paths.map((p) => {
+        const c = draft._files[p]; const bin = C.isBinary(c);
+        return h('div', { class: 'attach-row' }, h('span', null, bin ? '🗃' : C.isExecutable(p, c) ? '⚙️' : '📄'),
+          h('span', { class: 'grow mono', title: p }, p), h('span', { class: 'muted small' }, fmtSize(C.contentSize(c))),
+          !bin ? h('button', { class: 'btn ghost icon sm', title: 'Edit', onclick: () => editFile(p) }, icon('edit', 13)) : null,
+          h('button', { class: 'btn ghost icon sm', title: 'Download', onclick: () => AIC.download(p.split('/').pop(), new Blob([C.contentToData(c)])) }, icon('download', 13)),
+          h('button', { class: 'btn ghost icon sm', title: 'Remove', onclick: async () => { if (await confirmDialog(h('div', null, 'Remove ', h('code', null, p), ' from the skill? It is deleted from the folder when you save.'), { danger: true, ok: 'Remove' })) { delete draft._files[p]; changed(); } } }, icon('trash', 13)));
+      })));
+    }
+    draw();
+    return box;
+  }
 
   function snippets(type) {
     const common = [
@@ -448,9 +516,9 @@
     let cur = 0;
     const code = h('pre', { class: 'code-view' });
     const tabs = h('div', { class: 'chips', style: { marginBottom: '10px' } });
-    const show = (i) => { cur = i; code.textContent = files[i].content; Array.from(tabs.children).forEach((c, j) => c.classList.toggle('accent', j === i)); };
+    const show = (i) => { cur = i; code.textContent = C.isBinary(files[i].content) ? `(binary file · ${Math.ceil(C.contentSize(files[i].content) / 1024)} KB — copied as is)` : files[i].content; Array.from(tabs.children).forEach((c, j) => c.classList.toggle('accent', j === i)); };
     files.forEach((f, i) => tabs.append(h('span', { class: 'chip mono', style: { cursor: 'pointer' }, onclick: () => show(i) }, f.path)));
-    wrap.append(tabs, h('div', { class: 'prompt-box' }, code, h('button', { class: 'btn sm copy', onclick: () => copy(files[cur].content) }, icon('copy', 13), h('span', null, 'Copy'))));
+    wrap.append(tabs, h('div', { class: 'prompt-box' }, code, h('button', { class: 'btn sm copy', onclick: () => { if (typeof files[cur].content === 'string') copy(files[cur].content); } }, icon('copy', 13), h('span', null, 'Copy'))));
     show(0);
     return wrap;
   }
