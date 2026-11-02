@@ -129,7 +129,8 @@
     F('targets', 'Target AIs', 'multi', { options: TARGETS }),
     F('status', 'Status', 'select', { options: STATUS }),
     F('version', 'Version', 'text', { placeholder: '1.0.0' }),
-    F('author', 'Author', 'text'),
+    F('author', 'Author', 'combo', { help: 'Who made it and can answer questions about it. Your default is set in Settings.' }),
+    F('area', 'Tribe / Area', 'combo', { help: 'Tribe, area or department that owns it. The shared list is set in Settings.' }),
     F('updated', 'Updated', 'readonly')
   ];
   const FIELDS = {
@@ -425,6 +426,7 @@
     item.name = item.name || item.id;
     item.description = item.description || '';
     item.body = item.body || '';
+    ['author', 'area'].forEach((k) => { if (item[k] !== undefined && item[k] !== null) item[k] = String(item[k]).trim(); });
     if (!item.status) item.status = 'draft';
     if (t === 'workflow') {
       item.inputs = Array.isArray(item.inputs) ? item.inputs : [];
@@ -481,7 +483,7 @@
       content = JSON.stringify(out, null, 2) + '\n';
     } else if (t === 'skill') {
       const meta = {};
-      ['name', 'icon', 'tags', 'audience', 'targets', 'status', 'version', 'author', 'updated'].forEach((k) => {
+      ['name', 'icon', 'tags', 'audience', 'targets', 'status', 'version', 'author', 'area', 'updated'].forEach((k) => {
         const v = data[k];
         if (isEmpty(v)) return;
         meta[k === 'name' ? 'title' : k] = Array.isArray(v) ? v.join(', ') : String(v);
@@ -593,6 +595,11 @@
     }
     if (type === 'mcp' && !partial?.transport) it.transport = 'stdio';
     return it;
+  }
+  /** Known values of an ownership field ('author' | 'area'): the workspace list plus what items already use. */
+  function ownerValues(lib, key) {
+    const base = key === 'area' ? arr((lib.config || {}).areas) : [];
+    return uniq([...base, ...(lib.items || []).map((i) => i[key])]).sort((a, b) => String(a).localeCompare(String(b), 'en'));
   }
   /** Reverse references: who uses this item? */
   function usagesOf(lib, type, id) {
@@ -1228,8 +1235,7 @@
       seen[key] = true;
       if (!it.description || it.description.length < 15) add('warn', 'Add a clear description (when to use it): it helps people and agents pick it.');
       if (it.type !== 'workflow' && !String(it.body || '').trim() && it.type !== 'mcp') add('warn', 'The content is empty.');
-      if (it.status === 'deprecated') add('info', 'Marked as deprecated.');
-      if (it.type === 'agent') {
+      if (it.status === 'deprecated') add('info', 'Marked as deprecated.');      if (it.type === 'agent') {
         it.skills.forEach((s) => { if (!L.get('skill', s)) add('error', `Missing skill: ${s}`); });
         it.knowledge.forEach((s) => { if (!L.get('knowledge', s)) add('error', `Missing knowledge: ${s}`); });
         it.mcp.forEach((s) => { if (!L.get('mcp', s)) add('error', `Missing MCP server: ${s}`); });
@@ -1716,7 +1722,7 @@
   return {
     VERSION, TYPES, TYPE_ORDER, AUDIENCES, TARGETS, STATUS, PROMPT_MODES, KNOWLEDGE_KINDS, COPILOT_TOOLS, M365_CAPS, MCP_TRANSPORTS,
     NODE_TYPES, FIELDS, BODY_LABEL, DEFAULT_CONFIG, EXPORTERS,
-    slugify, uniq, arr, today, clone, norm, uid, isEmpty, stableUuid,
+    slugify, uniq, arr, today, clone, norm, uid, isEmpty, stableUuid, ownerValues,
     parseYaml, toYaml, parseFrontmatter, stringifyFrontmatter,
     pathFor, classifyPath, itemFromFile, itemToFile, normalizeItem, newItem,
     libraryFromFiles, libraryToFiles, serializeBundle, parseBundle, sortItems, indexLib, usagesOf,

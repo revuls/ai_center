@@ -167,13 +167,15 @@
       fld('Name', inp(cfg, 'workspace', 'AI Center · Team X')),
       fld('Description', h('textarea', { rows: 2, value: cfg.description || '', oninput: (e) => { cfg.description = e.target.value; } })),
       fld('Default target AIs', V.fieldWidget({ key: 'defaultTargets', kind: 'multi', options: C.TARGETS }, cfg, () => {})),
+      fld('Tribes / Areas', V.fieldWidget({ key: 'areas', kind: 'tags' }, cfg, () => {}), 'Shared list suggested when filling in the Tribe / Area of an item, so everyone writes it the same way.'),
       h('div', { class: 'section-title' }, '🟦 Data for Copilot M365 packages'),
       fld('Organization (developer.name)', inp(cfg, 'organization', 'Mi Empresa')),
       fld('Website', inp(cfg, 'websiteUrl', 'https://…')), fld('Privacy', inp(cfg, 'privacyUrl', 'https://…/privacy')), fld('Terms of use', inp(cfg, 'termsUrl', 'https://…/terms')),
       fld('Accent color', h('input', { type: 'text', value: cfg.accentColor || '#6E56CF', oninput: (e) => { cfg.accentColor = e.target.value; } })),
       h('div', { class: 'row', style: { justifyContent: 'flex-end' } }, btn('Save workspace', async () => { await S.saveConfig(cfg); toast('Settings saved', 'ok'); }, { cls: 'primary', icon: 'save' })));
     const me = h('div', { class: 'card card-pad' }, h('h3', { style: { marginTop: 0 } }, '👤 Personal preferences'),
-      fld('Your name (default author)', h('input', { type: 'text', value: S.prefs.author, oninput: (e) => { S.prefs.author = e.target.value; S.savePrefs(); } })),
+      fld('Your name (default author)', V.fieldWidget({ key: 'author', kind: 'combo' }, S.prefs, () => S.savePrefs())),
+      fld('Your Tribe / Area (default)', V.fieldWidget({ key: 'area', kind: 'combo' }, S.prefs, () => S.savePrefs()), 'Filled in automatically on the items you create or duplicate.'),
       fld('Theme', h('select', { onchange: (e) => { S.prefs.theme = e.target.value; S.savePrefs(); AIC.app.applyTheme(); AIC.app.renderTopbar(); } }, ...[['auto', 'Automatic (system)'], ['light', 'Light'], ['dark', 'Dark']].map(([v, l]) => h('option', { value: v, selected: S.prefs.theme === v }, l)))),
       fld('Saved API key', h('div', { class: 'row' }, h('span', { class: 'small muted' }, S.prefs.llm.apiKey && S.prefs.llm.remember ? '•••• saved in this browser' : 'None'), S.prefs.llm.apiKey ? btn('Forget', () => { S.prefs.llm.apiKey = ''; S.prefs.llm.remember = false; S.savePrefs(); toast('Key forgotten'); AIC.app.route(); }, { cls: 'sm' }) : null)));
     const storage = h('div', { class: 'card card-pad' }, h('h3', { style: { marginTop: 0 } }, '💾 Files and backups'),

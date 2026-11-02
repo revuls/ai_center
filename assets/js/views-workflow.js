@@ -626,7 +626,7 @@
       const E = inspectorEl;
       const nodesN = wf.nodes.filter((n) => n.type !== 'note').length;
       E.append(h('div', { class: 'muted small', style: { marginBottom: '12px' } }, `${nodesN} nodes · ${wf.edges.length} connections · select a node to configure it`));
-      ['description', 'icon', 'tags', 'audience', 'targets', 'status', 'version'].forEach((k) => {
+      ['description', 'icon', 'author', 'area', 'tags', 'audience', 'targets', 'status', 'version'].forEach((k) => {
         const f = C.FIELDS.workflow.find((x) => x.key === k);
         E.append(h('div', { class: 'field' }, h('div', { class: 'lbl' }, f.label), V.fieldWidget(f, wf, () => { markDirty(); if (k === 'name') nameIn.value = wf.name; })));
       });
@@ -729,7 +729,7 @@
     }
     async function duplicateWorkflow() {
       const c = C.clone(wf);
-      c.id = S.uniqueId('workflow', (wf.name || 'workflow') + ' copy'); c.name = (wf.name || 'Workflow') + ' (copy)'; c.status = 'draft';
+      c.id = S.uniqueId('workflow', (wf.name || 'workflow') + ' copy'); c.name = (wf.name || 'Workflow') + ' (copy)'; c.status = 'draft'; S.claim(c);
       try { await S.save(c); dirty = false; AIC.app.dirty = null; toast('Duplicated'); go('#/workflow/' + encodeURIComponent(c.id)); }
       catch (e) { toast('Error: ' + e.message, 'err'); }
     }
@@ -797,7 +797,7 @@
   function newWorkflowDialog(root) {
     root.append(h('div', { class: 'page' }, h('div', { class: 'empty' }, h('div', { class: 'e-ico' }, '🔀'), 'Creating workflow…')));
     const start = (seed) => { V._wfSeed = seed; AIC.app.route(); };
-    const blank = () => C.newItem('workflow', { name: 'New workflow', description: '', author: S.prefs.author, targets: ['copilot', 'm365', 'any'] });
+    const blank = () => C.newItem('workflow', { name: 'New workflow', description: '', author: S.prefs.author, area: S.prefs.area, targets: ['copilot', 'm365', 'any'] });
     const templates = S.all('workflow');
     let closedByChoice = false;
     const choose = (fn) => { closedByChoice = true; m.close(); fn(); };
@@ -816,7 +816,7 @@
           })),
         templates.length ? h('div', null, h('div', { class: 'section-title', style: { marginTop: 0 } }, '📚 Start from an existing workflow'),
           h('div', { class: 'grid cols-3' }, ...templates.map((t) => card(t.icon || '🔀', t.name, t.description.slice(0, 110), () => {
-            const c = C.clone(t); c.id = ''; c.name = t.name + ' (copy)'; c.status = 'draft'; start(c);
+            const c = C.clone(t); c.id = ''; c.name = t.name + ' (copy)'; c.status = 'draft'; S.claim(c); start(c);
           })))) : null),
       onClose: () => { if (!closedByChoice) go('#/library/workflow'); }
     });
@@ -869,7 +869,7 @@ Rules: include human reviews at critical points, decisions with labelled outputs
         const raw = out.value.trim().replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '');
         let data;
         try { data = JSON.parse(raw.slice(raw.indexOf('{'), raw.lastIndexOf('}') + 1)); } catch (e) { toast('Invalid JSON: ' + e.message, 'err', 5000); return; }
-        const wf = C.normalizeItem(Object.assign(C.newItem('workflow', { author: S.prefs.author }), data, { type: 'workflow', id: '' }));
+        const wf = C.normalizeItem(Object.assign(C.newItem('workflow', { author: S.prefs.author, area: S.prefs.area }), data, { type: 'workflow', id: '' }));
         wf.edges = wf.edges.map((e) => Object.assign({ id: C.uid('e') }, e));
         wf.nodes.forEach((n) => { if (!n.id) n.id = C.uid('n'); if (n.x === undefined) { n.x = 0; n.y = 0; } });
         C.autoLayout(wf);

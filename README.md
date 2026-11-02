@@ -51,6 +51,7 @@ Open `index.html`, click **Connect folder** and pick the repository folder. In *
 
 - The workspace name and description.
 - The default target AIs.
+- The list of Tribes / Areas, plus your own name and Tribe / Area (they fill in the authorship of what you create).
 - Organization, website, privacy and terms URLs (only needed if you will publish Copilot M365 agents).
 
 ### 4. Create the pieces in this order

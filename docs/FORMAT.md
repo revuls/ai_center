@@ -14,7 +14,9 @@ The whole framework lives in `library/`. Each item's **id** is its file name (lo
 | `targets` | list | `copilot`, `m365`, `claude`, `chatgpt`, `cursor`, `any` |
 | `status` | text | `draft`, `review`, `stable`, `deprecated` (deprecated items are not exported) |
 | `version` | text | SemVer recommended |
-| `author`, `updated` | text | Authorship and date (the app updates it) |
+| `author` | text | Who made it and can answer questions about it. The app fills it in from *Your name* in Settings |
+| `area` | text | Tribe, area or department that owns it. The app fills it in from *Your Tribe / Area* in Settings |
+| `updated` | text | Date of the last change (the app updates it) |
 
 Unknown fields are preserved on save.
 
@@ -175,6 +177,6 @@ When a step declares `files`, its prompt asks the AI to return **each file compl
 
 ## Other files
 
-- `ai-center.json`: workspace configuration (`workspace`, `description`, `defaultTargets`, `organization`, `websiteUrl`, `privacyUrl`, `termsUrl`, `accentColor`).
+- `ai-center.json`: workspace configuration (`workspace`, `description`, `defaultTargets`, `areas` (shared list of Tribes/Areas suggested in the editor), `organization`, `websiteUrl`, `privacyUrl`, `termsUrl`, `accentColor`).
 - `library.bundle.js`: generated snapshot (do not edit). Regenerate with `node cli/aic.mjs bundle`.
 - `runs/<date>-<workflow>/`: `run.json`, `REPORT.md` and one file per step.

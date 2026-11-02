@@ -195,7 +195,7 @@
       const draw = () => {
         const q = C.norm(inp.value);
         const score = (it) => {
-          const hay = C.norm([it.name, it.id, it.description, ...(it.tags || [])].join(' '));
+          const hay = C.norm([it.name, it.id, it.description, it.author, it.area, ...(it.tags || [])].join(' '));
           if (!q) return 1;
           if (C.norm(it.name).startsWith(q)) return 3;
           if (C.norm(it.name).includes(q)) return 2;

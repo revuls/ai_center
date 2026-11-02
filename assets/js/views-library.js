@@ -26,6 +26,9 @@
         h('div', { class: 'ic-emoji' }, it.icon || t.icon),
         h('div', { class: 'grow' }, h('div', { class: 'ic-title' }, it.name), h('div', { class: 'ic-id' }, t.singular + ' · ' + it.id))),
       h('div', { class: 'ic-desc' }, it.description || h('i', { class: 'muted' }, 'No description')),
+      it.author || it.area ? h('div', { class: 'ic-owner' },
+        it.author ? h('span', { title: 'Author' }, '👤 ' + it.author) : null,
+        it.area ? h('span', { title: 'Tribe / Area' }, '🏢 ' + it.area) : null) : null,
       h('div', { class: 'ic-foot' },
         h('span', { class: 'chip st-' + it.status }, label(C.STATUS, it.status)),
         ...extra,
@@ -90,7 +93,7 @@
   V.list = function (root, typeArg) {
     const [type, qs] = String(typeArg).split('?');
     const params = new URLSearchParams(qs || '');
-    const state = { q: '', status: '', aud: params.get('aud') || '', target: '', tag: '', sort: 'name', view: S.prefs.view || 'grid' };
+    const state = { q: '', status: '', aud: params.get('aud') || '', target: '', tag: '', author: '', area: '', sort: 'name', view: S.prefs.view || 'grid' };
     const page = h('div', { class: 'page' });
     const isType = !!C.TYPES[type];
     const title = isType ? C.TYPES[type].label : type === 'favs' ? 'Favorites' : 'Whole library';
@@ -101,6 +104,8 @@
         isType ? btn('New ' + C.TYPES[type].singular.toLowerCase(), () => go(type === 'workflow' ? '#/workflow/new' : '#/new/' + type), { cls: 'primary', icon: 'plus' }) : null,
         btn('Import', () => V.importDialog(), { icon: 'upload' }))));
     const allTags = C.uniq(S.lib.items.flatMap((i) => i.tags)).sort();
+    const NO_AREA = '__none__';
+    const toOpts = (vals) => vals.map((v) => ({ value: v, label: v }));
     const search = h('input', { type: 'search', placeholder: 'Filter…', oninput: (e) => { state.q = e.target.value; draw(); } });
     const sel = (opts, key, ph) => h('select', { onchange: (e) => { state[key] = e.target.value; draw(); } }, h('option', { value: '' }, ph), ...opts.map((o) => h('option', { value: o.value, selected: state[key] === o.value }, o.label)));
     const viewBtns = h('div', { class: 'btn-group', style: { marginLeft: 'auto' } },
@@ -110,6 +115,8 @@
     page.append(h('div', { class: 'toolbar' }, search,
       !isType ? sel(C.TYPE_ORDER.map((t) => ({ value: t, label: C.TYPES[t].label })), 'type', 'Type: all') : null,
       sel(C.AUDIENCES, 'aud', 'Audience: all'), sel(C.TARGETS, 'target', 'AI: all'), sel(C.STATUS, 'status', 'Status: all'),
+      sel([...toOpts(C.ownerValues(S.lib, 'area')), { value: NO_AREA, label: 'Unassigned' }], 'area', 'Tribe/Area: all'),
+      sel(toOpts(C.ownerValues(S.lib, 'author')), 'author', 'Author: all'),
       allTags.length ? sel(allTags.map((t) => ({ value: t, label: '#' + t })), 'tag', 'Tag: all') : null,
       sel([{ value: 'name', label: 'Sort: name' }, { value: 'updated', label: 'Sort: recent' }], 'sort', 'Sort'),
       viewBtns));
@@ -124,22 +131,26 @@
       if (state.target) items = items.filter((i) => i.targets.includes(state.target) || i.targets.includes('any') || !i.targets.length);
       if (state.status) items = items.filter((i) => i.status === state.status);
       if (state.tag) items = items.filter((i) => i.tags.includes(state.tag));
-      if (state.q) { const q = C.norm(state.q); items = items.filter((i) => C.norm([i.name, i.id, i.description, i.tags.join(' '), i.body].join(' ')).includes(q)); }
+      if (state.area) items = items.filter((i) => state.area === NO_AREA ? !i.area : i.area === state.area);
+      if (state.author) items = items.filter((i) => i.author === state.author);
+      if (state.q) { const q = C.norm(state.q); items = items.filter((i) => C.norm([i.name, i.id, i.description, i.tags.join(' '), i.author, i.area, i.body].join(' ')).includes(q)); }
       items = items.slice().sort(state.sort === 'updated' ? (a, b) => String(b.updated || '').localeCompare(String(a.updated || '')) : (a, b) => String(a.name).localeCompare(String(b.name), 'en'));
       out.innerHTML = '';
       if (!items.length) {
         out.append(h('div', { class: 'card empty' }, h('div', { class: 'e-ico' }, isType ? C.TYPES[type].icon : '🔎'),
-          h('div', null, state.q || state.aud || state.status || state.tag ? 'No results with those filters.' : 'Nothing here yet.'),
+          h('div', null, state.q || state.aud || state.status || state.tag || state.area || state.author ? 'No results with those filters.' : 'Nothing here yet.'),
           isType ? h('div', { style: { marginTop: '12px' } }, btn('Create the first one', () => go(type === 'workflow' ? '#/workflow/new' : '#/new/' + type), { cls: 'primary', icon: 'plus' })) : null));
         return;
       }
       if (state.view === 'table') {
         out.append(h('div', { class: 'card' }, h('table', { class: 'list-table' },
-          h('thead', null, h('tr', null, h('th', null, 'Name'), h('th', null, 'Type'), h('th', null, 'Description'), h('th', null, 'Status'), h('th', null, 'Updated'))),
+          h('thead', null, h('tr', null, h('th', null, 'Name'), h('th', null, 'Type'), h('th', null, 'Description'), h('th', null, 'Author'), h('th', null, 'Tribe / Area'), h('th', null, 'Status'), h('th', null, 'Updated'))),
           h('tbody', null, ...items.map((it) => h('tr', { onclick: () => AIC.app.openItem(it) },
             h('td', null, h('b', null, (it.icon || C.TYPES[it.type].icon) + ' ' + it.name), h('div', { class: 'muted small mono' }, it.id)),
             h('td', null, h('span', { class: 'chip type', style: { background: typeColor(it.type) } }, C.TYPES[it.type].singular)),
             h('td', { class: 'small', style: { maxWidth: '480px' } }, it.description),
+            h('td', { class: 'small' }, it.author || ''),
+            h('td', { class: 'small' }, it.area || ''),
             h('td', null, h('span', { class: 'chip st-' + it.status }, label(C.STATUS, it.status))),
             h('td', { class: 'small muted' }, it.updated || '')))))));
       } else out.append(h('div', { class: 'grid cols-auto' }, ...items.map(itemCard)));
@@ -158,6 +169,12 @@
     const v = item[f.key];
     switch (f.kind) {
       case 'text': return h('input', { type: 'text', value: v || '', placeholder: f.placeholder || '', oninput: (e) => set(e.target.value) });
+      case 'combo': {
+        const dl = 'dl-' + Math.random().toString(36).slice(2);
+        return h('div', null,
+          h('input', { type: 'text', value: v || '', list: dl, placeholder: f.placeholder || '', oninput: (e) => set(e.target.value) }),
+          h('datalist', { id: dl }, ...C.ownerValues(S.lib, f.key).map((o) => h('option', { value: o }))));
+      }
       case 'readonly': return h('input', { type: 'text', value: v || '—', readOnly: true, disabled: true });
       case 'textarea': return h('textarea', { rows: 3, value: v || '', placeholder: f.placeholder || '', oninput: (e) => set(e.target.value) });
       case 'select': return h('select', { onchange: (e) => set(e.target.value) }, ...f.options.map((o) => h('option', { value: o.value, selected: (v || '') === o.value }, o.label)));
@@ -269,7 +286,7 @@
     if (type === 'workflow') { go('#/workflow/' + (id || 'new')); return; }
     const existing = id ? S.get(type, id) : null;
     if (id && !existing) { root.append(h('div', { class: 'page' }, h('div', { class: 'card empty' }, h('div', { class: 'e-ico' }, '🔎'), 'No existe ', h('code', null, type + ':' + id), h('div', { style: { marginTop: '10px' } }, btn('Back', () => go('#/library/' + type)))))); return; }
-    let draft = existing ? C.clone(existing) : C.newItem(type, { body: TEMPLATES[type] || '', author: S.prefs.author, targets: (S.lib.config.defaultTargets || []).slice() });
+    let draft = existing ? C.clone(existing) : C.newItem(type, { body: TEMPLATES[type] || '', author: S.prefs.author, area: S.prefs.area, targets: (S.lib.config.defaultTargets || []).slice() });
     if (existing && existing._files) draft._files = Object.assign({}, existing._files);
     const prevKey = existing ? S.keyOf(existing) : null;
     let dirty = false; let idTouched = !!existing;
@@ -311,7 +328,7 @@
       existing ? { icon: 'trash', label: 'Delete', onClick: () => del() } : null
     ], { align: 'right' }) }, icon('menu'));
     const duplicate = () => {
-      const c = C.clone(draft); c.id = S.uniqueId(type, draft.name + ' copy'); c.name = draft.name + ' (copy)'; c.status = 'draft';
+      const c = C.clone(draft); c.id = S.uniqueId(type, draft.name + ' copy'); c.name = draft.name + ' (copy)'; c.status = 'draft'; S.claim(c);
       S.save(c).then((it) => { toast('Duplicated'); AIC.app.openItem(it); });
     };
     const del = async () => {

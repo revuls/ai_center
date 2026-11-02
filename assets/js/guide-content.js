@@ -238,7 +238,7 @@ Copilot M365 does not chain agents on its own: use the **Runner** in **Manual** 
 - **Sensitive data**: do not include personal or confidential data in example prompts or shared knowledge.
 - **Mandatory human review** before irreversible actions (merge, deploy, sending to customers).
 - **Lifecycle**: Draft → In review → Stable → Deprecated. Deprecated items are not exported.
-- **Ownership**: fill in *Author* and review changes via PR (CODEOWNERS on \`library/\`).
+- **Ownership**: fill in *Author* and *Tribe / Area* so other departments know who to ask (set your defaults in **Settings**), and review changes via PR (CODEOWNERS on \`library/\`).
 - **CI validation**: \`node cli/aic.mjs lint\` returns an error code if there are errors.
 - **Runner API keys**: only in your browser and only if you tick *Remember*.
 `

@@ -251,7 +251,7 @@ async function main() {
         const items = lib.items.filter((i) => i.type === t);
         if (!items.length) return;
         console.log('\n' + c.b(`${C.TYPES[t].icon} ${C.TYPES[t].label} (${items.length})`));
-        items.forEach((i) => console.log(`  ${c.cy(i.id.padEnd(28))} ${i.name} ${c.dim('· ' + i.status)}`));
+        items.forEach((i) => console.log(`  ${c.cy(i.id.padEnd(28))} ${i.name} ${c.dim('· ' + [i.status, i.author, i.area].filter(Boolean).join(' · '))}`));
       });
       console.log();
       break;

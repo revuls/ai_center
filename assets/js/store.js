@@ -53,7 +53,7 @@
     get(k, d) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch (e) { return d; } },
     set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* ignore */ } }
   };
-  const prefs = Object.assign({ theme: 'auto', favorites: [], recent: [], author: '', llm: { provider: 'manual', model: '', baseUrl: '', apiKey: '', remember: false }, view: 'grid' }, ls.get(PREFS_KEY, {}));
+  const prefs = Object.assign({ theme: 'auto', favorites: [], recent: [], author: '', area: '', llm: { provider: 'manual', model: '', baseUrl: '', apiKey: '', remember: false }, view: 'grid' }, ls.get(PREFS_KEY, {}));
   function savePrefs() {
     const copy = JSON.parse(JSON.stringify(prefs));
     if (!copy.llm.remember) copy.llm.apiKey = '';
@@ -190,10 +190,16 @@
     },
 
     /* ---------- Writing ---------- */
+    /** A copy belongs to whoever makes it, not to the author of the original. */
+    claim(item) {
+      if (prefs.author || prefs.area) { item.author = prefs.author; item.area = prefs.area; }
+      return item;
+    },
     async save(item, prevKey, opts) {
       opts = opts || {};
       item.updated = C.today();
-      if (!item.author && prefs.author) item.author = prefs.author;
+      // Only for items nobody owns yet: editing someone else's item must not reassign its Tribe/Area
+      if (!item.author && prefs.author) { item.author = prefs.author; if (!item.area) item.area = prefs.area; }
       C.normalizeItem(item);
       const key = keyOf(item);
       const prev = prevKey && prevKey !== key ? this.lib.items.find((i) => keyOf(i) === prevKey) : null;
