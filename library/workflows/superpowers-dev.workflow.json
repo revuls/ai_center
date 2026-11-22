@@ -1,0 +1,201 @@
+{
+  "name": "Superpowers development",
+  "description": "Example workflow built on the Superpowers skills (obra/superpowers): brainstorm a design, write a plan, implement it with TDD, verify, request and handle code review, and finish the branch, with human approvals at the milestones.",
+  "icon": "🦸",
+  "tags": [
+    "dev",
+    "superpowers",
+    "tdd",
+    "e2e"
+  ],
+  "audience": [
+    "dev"
+  ],
+  "targets": [
+    "claude",
+    "copilot",
+    "any"
+  ],
+  "status": "review",
+  "version": "1.0.0",
+  "author": "AI Center",
+  "updated": "2026-11-22",
+  "inputs": [
+    {
+      "name": "idea",
+      "label": "What to build",
+      "description": "The feature, change or problem to work on",
+      "required": true
+    },
+    {
+      "name": "scope",
+      "label": "Relevant files or folders",
+      "description": "Optional: paths or globs to read as context, comma-separated (e.g. src/billing/, docs/architecture/)",
+      "required": false
+    }
+  ],
+  "nodes": [
+    {
+      "id": "start",
+      "type": "start",
+      "title": "Start",
+      "x": 40,
+      "y": 220
+    },
+    {
+      "id": "brainstorm",
+      "type": "step",
+      "title": "Brainstorm the design",
+      "agent": "architect",
+      "skills": [
+        "brainstorming"
+      ],
+      "instructions": "Apply the brainstorming skill to this idea:\n\n{{idea}}\n\nExplore the project context, list the open questions and 2-3 approaches with trade-offs, and recommend one. End with a short design document.",
+      "outputKey": "design",
+      "deliverable": "Design document with the chosen approach",
+      "contextFiles": [
+        "{{scope}}"
+      ],
+      "files": [
+        "docs/superpowers/design.md"
+      ],
+      "x": 260,
+      "y": 200
+    },
+    {
+      "id": "design_ok",
+      "type": "human",
+      "title": "Approve the design",
+      "owner": "Tech Lead",
+      "instructions": "Answer the open questions and confirm (or change) the chosen approach before planning.",
+      "x": 560,
+      "y": 210
+    },
+    {
+      "id": "plan",
+      "type": "step",
+      "title": "Write the implementation plan",
+      "agent": "architect",
+      "skills": [
+        "writing-plans"
+      ],
+      "instructions": "Apply the writing-plans skill to the approved design:\n\n{{design}}\n\nSplit the work into small tasks, each with its files, the test to write first and how to verify it.",
+      "outputKey": "plan",
+      "deliverable": "Step-by-step implementation plan",
+      "files": [
+        "docs/superpowers/plan.md"
+      ],
+      "x": 840,
+      "y": 200
+    },
+    {
+      "id": "plan_ok",
+      "type": "human",
+      "title": "Approve the plan",
+      "owner": "Tech Lead",
+      "instructions": "Check that the tasks are small, ordered and testable.",
+      "x": 1120,
+      "y": 210
+    },
+    {
+      "id": "impl",
+      "type": "step",
+      "title": "Implement with TDD",
+      "agent": "developer",
+      "skills": [
+        "using-git-worktrees",
+        "executing-plans",
+        "test-driven-development",
+        "systematic-debugging",
+        "verification-before-completion"
+      ],
+      "instructions": "Execute the plan task by task on an isolated branch:\n\n{{plan}}\n\nFor each task write the failing test first, make it pass with the minimal code, and debug failures systematically. If there is review feedback below, apply the receiving-code-review skill to it first.\n\n{{prev}}",
+      "outputKey": "implementation",
+      "deliverable": "Code and tests on a branch, with the verification commands run and their output",
+      "context": "prev",
+      "contextFiles": [
+        "{{scope}}"
+      ],
+      "x": 1400,
+      "y": 200
+    },
+    {
+      "id": "review",
+      "type": "step",
+      "title": "Code review",
+      "agent": "code-reviewer",
+      "skills": [
+        "requesting-code-review"
+      ],
+      "instructions": "Review the implementation against the plan and the design. The first line must be APPROVED or CHANGES REQUIRED.\n\n{{implementation}}",
+      "outputKey": "review",
+      "context": "all",
+      "x": 1680,
+      "y": 200
+    },
+    {
+      "id": "review_ok",
+      "type": "condition",
+      "title": "Review approved?",
+      "question": "Did the reviewer give the APPROVED verdict (no blocking findings)?",
+      "x": 1960,
+      "y": 210
+    },
+    {
+      "id": "finish",
+      "type": "step",
+      "title": "Finish the branch",
+      "agent": "developer",
+      "skills": [
+        "verification-before-completion",
+        "finishing-a-development-branch"
+      ],
+      "instructions": "Run the full test suite once more, then present the integration options (merge, PR, keep or discard) with a PR description ready.",
+      "outputKey": "finish",
+      "deliverable": "Verified branch and PR description",
+      "context": "all",
+      "x": 2240,
+      "y": 120
+    },
+    {
+      "id": "final_ok",
+      "type": "human",
+      "title": "Choose how to integrate",
+      "owner": "Developer",
+      "instructions": "Pick merge, PR, keep or discard. Nothing is pushed or merged without this approval.",
+      "x": 2520,
+      "y": 130
+    },
+    {
+      "id": "end",
+      "type": "end",
+      "title": "Work integrated",
+      "deliverable": "Branch merged or Pull Request opened",
+      "x": 2800,
+      "y": 140
+    },
+    {
+      "id": "note1",
+      "type": "note",
+      "text": "🦸 Skills from obra/superpowers (MIT, Jesse Vincent). Works best with an agentic provider (claude-code or copilot) so the steps can run tests and git in your repository: --provider claude-code --cwd ../my-repo",
+      "x": 260,
+      "y": 40
+    }
+  ],
+  "edges": [
+    { "id": "e1", "from": "start", "to": "brainstorm" },
+    { "id": "e2", "from": "brainstorm", "to": "design_ok" },
+    { "id": "e3", "from": "design_ok", "to": "plan", "label": "approved" },
+    { "id": "e4", "from": "design_ok", "to": "brainstorm", "label": "changes" },
+    { "id": "e5", "from": "plan", "to": "plan_ok" },
+    { "id": "e6", "from": "plan_ok", "to": "impl", "label": "approved" },
+    { "id": "e7", "from": "plan_ok", "to": "plan", "label": "changes" },
+    { "id": "e8", "from": "impl", "to": "review" },
+    { "id": "e9", "from": "review", "to": "review_ok" },
+    { "id": "e10", "from": "review_ok", "to": "finish", "label": "yes" },
+    { "id": "e11", "from": "review_ok", "to": "impl", "label": "no" },
+    { "id": "e12", "from": "finish", "to": "final_ok" },
+    { "id": "e13", "from": "final_ok", "to": "end", "label": "approved" },
+    { "id": "e14", "from": "final_ok", "to": "impl", "label": "changes" }
+  ]
+}
