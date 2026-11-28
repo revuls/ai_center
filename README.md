@@ -111,6 +111,7 @@ Full specification: [docs/FORMAT.md](docs/FORMAT.md).
 | **App** | **Run** button → *Manual* (copy/paste into Copilot M365, Copilot Chat…), *API* (Anthropic, OpenAI‑compatible, Azure) or *Simulation*. On-screen human reviews. Report at the end. |
 | **GitHub Copilot (VS Code)** | Export and type `/wf-<id>` in the chat in agent mode. |
 | **Copilot coding agent** | Assign an issue: «Run the workflow in `.github/prompts/wf-<id>.prompt.md` with …». It reads `AGENTS.md`. |
+| **GitHub Copilot CLI** | Export, open `copilot` in the repo and type `/run-<id> <your input>` (each workflow is also exported as a skill). |
 | **CLI** | `node cli/aic.mjs run <id> --input key=value --provider copilot` |
 
 **Files as inputs and context**: workflow inputs can be of type **File(s)** or **Folder** (`{{spec}}` becomes the files' content), and each step can list **📂 Context files** (`src/**/*.ts`, `docs/`, `{{suspects}}`) to read from your repository. The app asks you to pick the files/folder, the CLI reads `--input spec=@path` and the `--cwd` folder, and agents with tools read them directly. Details in [docs/FORMAT.md](docs/FORMAT.md#input-and-context-files).
@@ -118,6 +119,28 @@ Full specification: [docs/FORMAT.md](docs/FORMAT.md).
 **Steps that must produce files**: list them in the step's **📄 Output files** field (e.g. `docs/design/{{feature}}.md`). The AI returns each file in a `file=<path>` block; the app lets you download them or write them into your repository, the CLI saves them in `runs/<run>/files/` (add `--write-files <dir>` to write them into a folder), and agents with tools create them directly in the repo. Details in [docs/FORMAT.md](docs/FORMAT.md#output-files).
 
 CLI providers: `manual` · `copilot` (Copilot CLI, runs tools in your repo) · `claude-code` · `anthropic` · `github` (GitHub Models) · `openai` · `azure` · `ollama`.
+
+## Using it with GitHub Copilot CLI
+
+`node cli/aic.mjs export copilot --out ../my-repo` generates everything Copilot CLI reads:
+
+| File | Used by Copilot CLI for |
+|---|---|
+| `AGENTS.md`, `.github/copilot-instructions.md`, `.github/instructions/*.instructions.md` | Custom instructions (loaded automatically) |
+| `.github/agents/*.agent.md` | Custom agents: `/agent`, or `copilot --agent code-reviewer -p "…"` |
+| `.github/skills/*/SKILL.md` | Skills, loaded when relevant or invoked with `/<skill>` |
+| `.github/skills/run-<id>/SKILL.md` | E2E workflows: `/run-bugfix Login fails after the 2FA change` |
+| `.github/mcp.json` | MCP servers (needs the folder to be trusted; `${VAR}` values come from your environment) |
+
+Agent tools keep the VS Code names and also add the cross-tool aliases (`read`, `edit`, `search`, `execute`, `web`, `todo`), because Copilot CLI ignores names it does not know. `.github/prompts/` and `.vscode/mcp.json` are only for VS Code. Two harmless warnings in Copilot CLI: `unknown field ignored: handoffs` (VS Code only) and, when an agent's `model` (a VS Code display name such as `Claude Opus 5.5`) is not available in the CLI, it falls back to your current model.
+
+To let AI Center drive Copilot CLI step by step (with human reviews in your terminal and a report in `runs/`):
+
+```bash
+node cli/aic.mjs run bugfix --input symptoms="…" --provider copilot --cwd ../my-repo
+```
+
+It calls `copilot -p <step prompt> -s --no-ask-user --allow-all-tools` in `--cwd` for each step. Override the permissions with `AIC_COPILOT_ARGS` (e.g. `AIC_COPILOT_ARGS="--allow-tool=write --allow-tool=shell(git:*)"`) and the binary with `AIC_COPILOT_BIN`. Prompts over ~100 KB are passed as a file (with `--add-dir` to the run folder).
 
 ## CLI
 

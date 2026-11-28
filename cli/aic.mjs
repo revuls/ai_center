@@ -190,8 +190,21 @@ function makeLLM(provider, runDir) {
         return d.choices[0].message.content;
       }
       case 'copilot': {
+        // Copilot CLI programmatic mode: -p <prompt>, -s = print only the agent's answer, --no-ask-user = never block on questions
         const extra = (process.env.AIC_COPILOT_ARGS || '--allow-all-tools').split(/\s+/).filter(Boolean);
-        const args = ['-p', composed.full + AGENTIC_NOTE, ...extra];
+        let prompt = composed.full + AGENTIC_NOTE;
+        const args = [];
+        if (Buffer.byteLength(prompt) > 100000) {
+          // A single argv string is capped (~128 KB on Linux): hand over the prompt as a file instead
+          const pf = path.join(runDir, `${tag}-${C.slugify(composed.title)}.copilot-prompt.md`);
+          fs.writeFileSync(pf, prompt);
+          prompt = `Read the file ${pf} completely and follow its instructions exactly. It is the full prompt for this step.`;
+          args.push('--add-dir', runDir);
+        }
+        args.unshift('-p', prompt);
+        if (!extra.includes('-s') && !extra.includes('--silent') && !extra.includes('--output-format')) args.push('-s');
+        if (!extra.includes('--no-ask-user')) args.push('--no-ask-user');
+        args.push(...extra);
         if (model) args.push('--model', model);
         return runProc(process.env.AIC_COPILOT_BIN || 'copilot', args, { cwd: flags.cwd ? path.resolve(flags.cwd) : process.cwd() });
       }

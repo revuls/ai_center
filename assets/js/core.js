@@ -1353,6 +1353,30 @@
     });
     return flavor === 'copilot' ? { servers, inputs } : { mcpServers: servers };
   }
+  /** Copilot CLI / coding agent MCP config (.github/mcp.json): mcpServers, type local|http|sse, tools, ${VAR} env references. */
+  function mcpServersCopilotCli(list) {
+    const { mcpServers: servers } = mcpServers(list, 'cli');
+    Object.values(servers).forEach((s) => {
+      if (s.type === 'stdio') s.type = 'local';
+      s.tools = ['*'];
+    });
+    return { mcpServers: servers };
+  }
+  /**
+   * Agent tool names: library agents use VS Code tool names (runCommands, usages…).
+   * Copilot CLI only understands the cross-tool aliases (read, edit, search, execute, web, todo, agent)
+   * and ignores unknown names, so we add the matching aliases (VS Code accepts them too).
+   */
+  const TOOL_ALIASES = {
+    search: ['search', 'read'], codebase: ['search', 'read'], usages: ['search', 'read'], problems: ['read'], changes: ['read', 'execute'],
+    edit: ['edit'], editFiles: ['edit'], new: ['edit'], runCommands: ['execute'], runTests: ['execute'], testFailure: ['execute'], terminalLastCommand: ['execute'],
+    runTasks: ['execute'], fetch: ['web'], githubRepo: ['web'], todos: ['todo'], runSubagent: ['agent']
+  };
+  function agentToolsFor(tools) {
+    const list = arr(tools);
+    if (!list.length) return list;
+    return uniq([...list, ...list.flatMap((t) => TOOL_ALIASES[t] || [])]);
+  }
   function mermaid(lib, wf) {
     const esc = (s) => String(s || '').replace(/["\[\]{}()<>|#]/g, ' ').replace(/\s+/g, ' ').trim();
     const mid = (id) => 'n_' + String(id).replace(/[^\w]/g, '_');
@@ -1370,10 +1394,11 @@
     return lines.join('\n');
   }
   /** Runbook: the workflow as instructions an agent can execute (E2E). */
-  function workflowRunbook(lib, wf, flavor) {
+  function workflowRunbook(lib, wf, flavor, opts) {
     flavor = flavor || 'generic';
-    const P = paths(flavor);
-    const selfPath = P.workflow(wf.id);
+    // 'copilot-cli': same files as 'copilot', but packaged as a skill (Copilot CLI has no prompt files / ${input:} variables)
+    const P = paths(flavor === 'copilot-cli' ? 'copilot' : flavor);
+    const selfPath = (opts && opts.selfPath) || P.workflow(wf.id);
     const link = (path, label) => flavor === 'm365' ? `**${label}**` : `[${label}](${rel(selfPath, path)})`;
     const order = linearize(wf);
     const num = {}; order.forEach((n, i) => { num[n.id] = i + 1; });
@@ -1403,7 +1428,8 @@
       wf.inputs.forEach((i) => {
         const v = flavor === 'copilot' ? '${input:' + i.name + ':' + (i.description || i.label || i.name).replace(/[{}:]/g, ' ') + '}'
           : flavor === 'claude' ? (wf.inputs.length === 1 ? '$ARGUMENTS' : '(ask the user if it is not in $ARGUMENTS)')
-            : `[${(i.label || i.name).toUpperCase()}]`;
+            : flavor === 'copilot-cli' ? (i.required ? '(take it from the user\'s message; ask for it if missing)' : '(take it from the user\'s message if given)')
+              : `[${(i.label || i.name).toUpperCase()}]`;
         const kind = i.type === 'file' ? ' (file path — read its content)' : i.type === 'folder' ? ` (folder path — read the files${i.pattern ? ' matching `' + i.pattern + '`' : ''} inside it)` : '';
         L2.push(`- **${i.label || i.name}**${i.required ? ' (required)' : ''}${kind}: ${v}${i.description && flavor !== 'copilot' ? ` — ${i.description}` : ''}`);
       });
@@ -1520,7 +1546,7 @@
     if (ag.length || wf.length) {
       ci += '\n\n## Available AI resources\n\n';
       if (ag.length) ci += '**Custom agents** (chat agent picker):\n' + ag.map((a) => `- \`${a.id}\` — ${a.name}: ${a.description}`).join('\n') + '\n\n';
-      if (wf.length) ci += '**E2E workflows** (type `/wf-<id>` in the chat):\n' + wf.map((w) => `- \`/wf-${w.id}\` — ${w.name}`).join('\n') + '\n';
+      if (wf.length) ci += '**E2E workflows** (VS Code chat: `/wf-<id>` · Copilot CLI: `/run-<id>` skill):\n' + wf.map((w) => `- \`/wf-${w.id}\` · \`/run-${w.id}\` — ${w.name}`).join('\n') + '\n';
     }
     add('.github/copilot-instructions.md', ci + '\n');
     by('instruction').filter((i) => !i.global).forEach((i) => add(`.github/instructions/${i.id}.instructions.md`, fmFile({ description: i.description, applyTo: i.applyTo || '**' }, i.body)));
@@ -1530,7 +1556,7 @@
     });
     ag.forEach((a) => {
       const path = P.agent(a.id);
-      const tools = uniq([...a.tools, ...a.mcp.filter((m) => L.get('mcp', m)).map((m) => `${m}/*`)]);
+      const tools = uniq([...agentToolsFor(a.tools), ...a.mcp.filter((m) => L.get('mcp', m)).map((m) => `${m}/*`)]);
       const handoffs = a.handoffs.map((h) => L.get('agent', h)).filter(Boolean).map((h) => ({ label: `Continue with ${h.name}`, agent: h.id, prompt: `Continue from the previous work in your role as ${h.name}.`, send: false }));
       add(path, fmFile({ name: a.name, description: a.description, tools, model: a.model, handoffs }, agentBodyFor(lib, a, 'copilot', path)));
     });
@@ -1540,9 +1566,16 @@
     });
     by('knowledge').forEach((k) => add(P.knowledge(k.id), `# ${k.name}\n\n${k.description ? '> ' + k.description + '\n\n' : ''}${k.body.trim()}\n`));
     const mcps = by('mcp');
-    if (mcps.length) add('.vscode/mcp.json', JSON.stringify(mcpServers(mcps, 'copilot'), null, 2) + '\n');
+    if (mcps.length) {
+      add('.vscode/mcp.json', JSON.stringify(mcpServers(mcps, 'copilot'), null, 2) + '\n');          // VS Code
+      add('.github/mcp.json', JSON.stringify(mcpServersCopilotCli(mcps), null, 2) + '\n');           // Copilot CLI
+    }
     wf.forEach((w) => {
       add(P.workflow(w.id), fmFile({ description: `E2E workflow: ${w.name}`, agent: 'agent' }, workflowRunbook(lib, w, 'copilot')));
+      // Copilot CLI has no prompt files: each workflow is also a skill, invoked with /run-<id>
+      const skillPath = `.github/skills/run-${w.id}/SKILL.md`;
+      add(skillPath, fmFile({ name: `run-${w.id}`, description: trunc(`Runs the E2E workflow "${w.name}" step by step, stopping at human reviews. ${w.description || ''}`.trim(), 1000) },
+        workflowRunbook(lib, w, 'copilot-cli', { selfPath: skillPath })));
       add(`docs/ai/workflows/${w.id}.workflow.json`, itemToFile(w).content);
     });
     add('AGENTS.md', agentsMd(lib, 'copilot', opts));
@@ -1702,7 +1735,7 @@
     return files;
   }
   const EXPORTERS = {
-    copilot: { label: 'GitHub Copilot', desc: '.github/ (instructions, prompts, agents, skills), .vscode/mcp.json, AGENTS.md and workflows as /wf-*', fn: exportCopilot },
+    copilot: { label: 'GitHub Copilot', desc: '.github/ (instructions, prompts, agents, skills, mcp.json), .vscode/mcp.json, AGENTS.md; workflows as /wf-* (VS Code) and /run-* skills (Copilot CLI)', fn: exportCopilot },
     m365: { label: 'Copilot M365', desc: 'Declarative agents (manifest + declarativeAgent.json + icons), Agent Builder guide, prompts and guided workflows', fn: exportM365 },
     claude: { label: 'Claude Code', desc: 'CLAUDE.md, .claude/agents, .claude/commands, .claude/skills, .mcp.json', fn: exportClaude },
     cursor: { label: 'Cursor', desc: '.cursor/rules/*.mdc, .cursor/commands, .cursor/mcp.json', fn: exportCursor },
