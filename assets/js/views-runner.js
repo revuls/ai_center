@@ -46,12 +46,26 @@
   V.callLLM = callLLM;
 
   /* ======================================================== *
+   * Background run sessions
+   * A started run keeps living (with its DOM) when you navigate away,
+   * so you can come back to #/run/<id> and pick it up where it is.
+   * ======================================================== */
+  const SESSIONS = new Map(); // wfId → { wfId, name, icon, page, state, startedAt }
+  const activeRuns = () => Array.from(SESSIONS.values());
+  V.activeRuns = activeRuns;
+  V.runningCount = () => activeRuns().filter((x) => x.state === 'running' || x.state === 'waiting').length;
+  const sessionChanged = () => { try { AIC.app.renderNav(); } catch (e) { /* shell not ready */ } };
+
+  /* ======================================================== *
    * Runner
    * ======================================================== */
   V.runner = function (root, wfId) {
+    const existing = SESSIONS.get(wfId);
+    if (existing) { root.append(existing.page); return; }
     const wf = S.get('workflow', wfId);
     const page = h('div', { class: 'page' });
     root.append(page);
+    let sess = null;
     if (!wf) { page.append(h('div', { class: 'card empty' }, h('div', { class: 'e-ico' }, '🔎'), 'Workflow not found.', h('div', { style: { marginTop: '10px' } }, btn('View workflows', () => go('#/library/workflow'))))); return; }
     const cfg = Object.assign({ provider: 'manual', model: '', baseUrl: '', apiKey: '', apiVersion: '2024-10-21', remember: false }, S.prefs.llm);
     const inputs = {};
@@ -101,6 +115,7 @@
     }
 
     function setup() {
+      if (sess) { SESSIONS.delete(wfId); sess = null; sessionChanged(); }
       body.innerHTML = '';
       const left = h('div', { class: 'card card-pad' });
       left.append(h('h3', { style: { marginTop: 0 } }, '📥 Inputs'));
@@ -147,6 +162,11 @@
       Object.assign(S.prefs.llm, cfg); S.savePrefs();
       running = true;
       ctrl = new AbortController();
+      sess = { wfId, name: wf.name, icon: wf.icon || '🔀', page, state: 'running', startedAt: new Date().toISOString() };
+      SESSIONS.set(wfId, sess);
+      sessionChanged();
+      const mySess = sess;
+      const setState = (st) => { if (SESSIONS.get(wfId) !== mySess) return; mySess.state = st; sessionChanged(); };
       body.innerHTML = '';
       const timeline = h('div', { class: 'card timeline' });
       const main = h('div', { class: 'col', style: { gap: '14px' } });
@@ -174,7 +194,11 @@
       };
       let currentPanel = null;
       const setPanel = (el) => { currentPanel = el; if (viewing === null) { main.innerHTML = ''; main.append(el); } };
-      const waitUser = () => new Promise((resolve, reject) => { pending = { resolve, reject }; });
+      const waitUser = () => {
+        setState('waiting');
+        if (!page.isConnected) toast(`${wf.icon || '🔀'} ${wf.name}: waiting for your input in Runs`, '', 5000);
+        return new Promise((resolve, reject) => { pending = { resolve, reject }; }).finally(() => { pending = null; setState('running'); });
+      };
 
       const hooks = {
         readFiles: workspace ? (patterns) => AIC.readLocalFiles(workspace, patterns) : undefined,
@@ -244,8 +268,15 @@
       drawTimeline();
       let run;
       try { run = await C.runWorkflow(S.lib, wf, Object.assign({}, inputs), hooks); }
-      catch (e) { toast('Error: ' + e.message, 'err', 6000); running = false; return; }
+      catch (e) {
+        toast('Error: ' + e.message, 'err', 6000); running = false; setState('error');
+        status.innerHTML = '';
+        status.append(h('span', { style: { fontSize: '20px' } }, '⚠'), h('b', null, 'Error: ' + e.message), h('div', { class: 'grow' }), btn('Run again', () => setup(), { cls: 'sm', icon: 'refresh' }));
+        return;
+      }
       running = false;
+      setState(run.status);
+      if (!page.isConnected) toast(`${wf.icon || '🔀'} ${wf.name}: ${run.status === 'completed' ? 'workflow completed' : run.status}`, run.status === 'completed' ? 'ok' : 'err', 5000);
       liveRun = run; viewing = null; drawTimeline();
       status.innerHTML = '';
       const ok = run.status === 'completed';
@@ -264,7 +295,7 @@
           btn('run.json', () => download(run.id + '.run.json', JSON.stringify(run, null, 2), 'application/json'), { cls: 'sm', icon: 'download' })),
         h('div', { class: 'md', html: md(report) })));
     }
-    return () => { if (running && ctrl) ctrl.abort(); };
+    // No cleanup: a started run keeps going in the background when you navigate away.
   };
 
   /* ---------- output files ---------- */
@@ -313,6 +344,14 @@
     const page = h('div', { class: 'page' });
     page.append(h('div', { class: 'page-head' }, h('div', null, h('h1', null, '▶ Runs'), h('p', null, 'Launch workflows end to end and browse the history. With the folder connected, each run is saved in runs/<id>/ (run.json + REPORT.md).'))));
     const wfs = S.all('workflow');
+    const live = activeRuns().sort((a, b) => String(b.startedAt).localeCompare(String(a.startedAt)));
+    const STATE = { running: ['⏳ Running', 'st-draft'], waiting: ['✋ Waiting for you', 'st-draft'], completed: ['✓ Completed', 'st-stable'], cancelled: ['⏹ Stopped', ''], error: ['⚠ Error', 'st-deprecated'] };
+    if (live.length) page.append(h('div', { class: 'section-title' }, '⚡ Current session runs ', h('span', { class: 'muted small' }, '(keep going while you navigate)')),
+      h('div', { class: 'card', style: { marginBottom: '18px' } }, h('table', { class: 'list-table' }, h('tbody', null, ...live.map((x) => h('tr', { onclick: () => go('#/run/' + encodeURIComponent(x.wfId)) },
+        h('td', null, x.icon, ' ', h('b', null, x.name)),
+        h('td', null, h('span', { class: 'chip ' + (STATE[x.state] || ['', ''])[1] }, (STATE[x.state] || [x.state])[0])),
+        h('td', { class: 'muted small' }, timeAgo(x.startedAt)),
+        h('td', { style: { textAlign: 'right' } }, btn('Open', () => go('#/run/' + encodeURIComponent(x.wfId)), { cls: 'sm', icon: 'play' }))))))));
     page.append(h('div', { class: 'section-title' }, '🚀 Launch'), wfs.length ? h('div', { class: 'grid cols-auto' }, ...wfs.map((w) => h('div', { class: 'card item-card', style: { '--tc': 'var(--c-workflow)' } },
       h('div', { class: 'ic-head' }, h('div', { class: 'ic-emoji' }, w.icon || '🔀'), h('div', { class: 'grow' }, h('div', { class: 'ic-title' }, w.name), h('div', { class: 'ic-id' }, w.nodes.filter((n) => n.type !== 'note').length + ' nodes'))),
       h('div', { class: 'ic-desc' }, w.description),

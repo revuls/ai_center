@@ -18,7 +18,10 @@
       this.renderShell();
       S.on((what) => { this.renderNav(); this.renderBanner(); if (what === 'load') this.route(); });
       window.addEventListener('hashchange', () => this.onHash());
-      window.addEventListener('beforeunload', (e) => { if (this.dirty && this.dirty()) { e.preventDefault(); e.returnValue = ''; } });
+      window.addEventListener('beforeunload', (e) => {
+        const runs = AIC.views.runningCount ? AIC.views.runningCount() : 0;
+        if ((this.dirty && this.dirty()) || runs) { e.preventDefault(); e.returnValue = ''; }
+      });
       document.addEventListener('keydown', (e) => {
         const mod = e.metaKey || e.ctrlKey;
         if (mod && e.key.toLowerCase() === 'k') { e.preventDefault(); this.palette(); }
@@ -71,7 +74,7 @@
         h('div', { class: 'nav-section' }, 'Library'),
         ...C.TYPE_ORDER.map((t) => link('#/library/' + t, C.TYPES[t].icon, C.TYPES[t].label, S.all(t).length)),
         h('div', { class: 'nav-section' }, 'Run and share'),
-        link('#/runs', 'play', 'Runs'),
+        link('#/runs', 'play', 'Runs', (AIC.views.runningCount && AIC.views.runningCount()) || undefined),
         link('#/export', 'export', 'Export to AIs'),
         link('#/health', 'pulse', 'Health', (() => { const n = C.lint(S.lib).filter((i) => i.level === 'error').length; return n || undefined; })()),
         h('div', { class: 'nav-section' }, 'Help'),

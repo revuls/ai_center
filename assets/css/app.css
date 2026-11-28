@@ -352,7 +352,11 @@ textarea.code { font-family: var(--mono); font-size: 13px; line-height: 1.6; tab
 .inp-row { display: grid; grid-template-columns: 1fr 1fr auto auto; gap: 6px; margin-bottom: 6px; align-items: center; }
 
 /* ---------- Runner ---------- */
-.runner { display: grid; grid-template-columns: 300px 1fr; gap: 18px; align-items: start; }
+.runner { display: grid; grid-template-columns: 300px minmax(0, 1fr); gap: 18px; align-items: start; }
+.runner > *, .runner .col, .runner .card { min-width: 0; }
+.runner .md { overflow-x: auto; overflow-wrap: anywhere; }
+.runner .md pre { max-width: 100%; }
+.runner .md table { display: block; overflow-x: auto; }
 .timeline { padding: 8px; position: sticky; top: 0; }
 .tl-step { display: flex; gap: 10px; padding: 9px 10px; border-radius: 10px; cursor: pointer; align-items: flex-start; }
 .tl-step:hover { background: var(--bg-hover); }
