@@ -858,24 +858,57 @@ Return ONLY valid JSON with this shape (no extra text):
 }
 Rules: include human reviews at critical points, decisions with labelled outputs, and use only existing ids (or leave the field empty).`;
     let accepted = false;
+    let closeModal = null;
+    /** Builds the workflow from the AI answer; returns an error message or undefined. */
+    const createFrom = (text) => {
+      let data;
+      try { data = C.parseLooseJson(text); } catch (e) { return 'Invalid JSON: ' + e.message; }
+      if (!data || typeof data !== 'object' || Array.isArray(data) || !Array.isArray(data.nodes)) return 'The JSON has no "nodes" list: paste the workflow object returned by the AI';
+      const wf = C.normalizeItem(Object.assign(C.newItem('workflow', { author: S.prefs.author, area: S.prefs.area }), data, { type: 'workflow', id: '' }));
+      wf.edges = wf.edges.map((e) => Object.assign({ id: C.uid('e') }, e));
+      wf.nodes.forEach((n) => { if (!n.id) n.id = C.uid('n'); if (n.x === undefined) { n.x = 0; n.y = 0; } });
+      C.autoLayout(wf);
+      accepted = true; closeModal(); start(wf);
+      return undefined;
+    };
+    // Option A: generate it directly with an AI engine (Copilot CLI, API…)
+    const cfg = AIC.ai.engineConfig();
+    if (cfg.provider === 'manual') cfg.provider = 'copilot-cli';
+    const genStatus = h('div');
+    let ctrl = null;
+    const genBtn = btn('Generate with AI', async () => {
+      if (!desc.value.trim()) { toast('Describe the process first', 'err'); desc.focus(); return; }
+      if (cfg.provider === 'manual') { toast('Manual: copy the design prompt below and paste the answer', 'err'); return; }
+      genBtn.disabled = true; ctrl = new AbortController();
+      genStatus.innerHTML = '';
+      genStatus.append(h('div', { class: 'callout small', style: { marginTop: '8px' } }, h('span', { class: 'spinner' }), h('div', null, 'Designing the workflow… this can take a minute.')));
+      try {
+        const full = promptFor();
+        const text = await AIC.ai.callEngine(cfg, { title: 'Design workflow', system: 'You design AI Center workflows. Answer only with JSON.', user: full, full, agent: null, skills: [], files: [] }, ctrl.signal);
+        out.value = text || '';
+        const err = createFrom(out.value);
+        genStatus.innerHTML = '';
+        if (err) genStatus.append(h('div', { class: 'callout err small', style: { marginTop: '8px' } }, '⚠', h('div', null, err, ' The answer is in the box below: fix it and click «Create on the canvas».')));
+      } catch (e) {
+        genStatus.innerHTML = '';
+        if (e.name !== 'AbortError') genStatus.append(h('div', { class: 'callout err small', style: { marginTop: '8px' } }, '⛔', h('div', null, e.message)));
+      } finally { genBtn.disabled = false; ctrl = null; }
+    }, { cls: 'primary', icon: 'sparkle' });
     modal({
       title: 'Design workflow with AI', titleIcon: '✨', size: 'wide',
       body: h('div', null,
         h('div', { class: 'steps-guide' },
           h('div', { class: 'card' }, h('b', null, 'Describe the process'), desc),
-          h('div', { class: 'card' }, h('b', null, 'Copy the prompt and paste it into Copilot Chat, Copilot M365, Claude or ChatGPT'), h('div', { style: { marginTop: '8px' } }, btn('Copy design prompt', () => copy(promptFor()), { icon: 'copy', cls: 'primary' }))),
-          h('div', { class: 'card' }, h('b', null, 'Paste the resulting JSON'), out))),
-      foot: (close) => [btn('Cancel', () => close(), { cls: 'ghost' }), btn('Create on the canvas', () => {
-        const raw = out.value.trim().replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '');
-        let data;
-        try { data = JSON.parse(raw.slice(raw.indexOf('{'), raw.lastIndexOf('}') + 1)); } catch (e) { toast('Invalid JSON: ' + e.message, 'err', 5000); return; }
-        const wf = C.normalizeItem(Object.assign(C.newItem('workflow', { author: S.prefs.author, area: S.prefs.area }), data, { type: 'workflow', id: '' }));
-        wf.edges = wf.edges.map((e) => Object.assign({ id: C.uid('e') }, e));
-        wf.nodes.forEach((n) => { if (!n.id) n.id = C.uid('n'); if (n.x === undefined) { n.x = 0; n.y = 0; } });
-        C.autoLayout(wf);
-        accepted = true; close(); start(wf);
-      }, { cls: 'primary', icon: 'sparkle' })],
-      onClose: () => { if (!accepted) go('#/library/workflow'); }
+          h('div', { class: 'card' }, h('b', null, 'Generate it with AI'),
+            h('div', { style: { marginTop: '8px' } }, AIC.ai.enginePanel(cfg)),
+            h('div', { class: 'row', style: { marginTop: '10px' } }, genBtn), genStatus,
+            h('div', { class: 'muted small', style: { marginTop: '10px' } }, 'Or do it by hand: ', btn('Copy design prompt', () => copy(promptFor()), { icon: 'copy', cls: 'sm' }), ' paste it into Copilot Chat, Copilot M365, Claude or ChatGPT, and paste the answer below.')),
+          h('div', { class: 'card' }, h('b', null, 'Resulting JSON'), out))),
+      foot: (close) => { closeModal = close; return [btn('Cancel', () => { if (ctrl) ctrl.abort(); close(); }, { cls: 'ghost' }), btn('Create on the canvas', () => {
+        const err = createFrom(out.value);
+        if (err) toast(err, 'err', 6000);
+      }, { cls: 'primary', icon: 'sparkle' })]; },
+      onClose: () => { if (ctrl) ctrl.abort(); if (!accepted) go('#/library/workflow'); }
     });
   }
 })();

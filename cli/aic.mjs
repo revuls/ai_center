@@ -12,6 +12,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import readline from 'node:readline';
 import zlib from 'node:zlib';
+import http from 'node:http';
+import os from 'node:os';
 
 const require = createRequire(import.meta.url);
 const C = require('../assets/js/core.js');
@@ -240,6 +242,8 @@ ${c.b('Usage')}  node cli/aic.mjs <command> [options]
                                    agentic providers read them themselves (force with --inline-context)
                                    Providers: manual (default) · copilot (Copilot CLI) · claude-code · anthropic
                                               github (GitHub Models) · openai · azure · ollama
+  ${c.cy('serve')} [--port 4317] [--cwd dir]       Serve the app on localhost with a Copilot CLI bridge: the Runner's
+                                   «Copilot CLI» engine runs each step with your logged-in \`copilot\` in --cwd
   ${c.cy('new')} <type> "<name>"               Create an item from a template
   ${c.cy('agents-md')}                        Regenerate the framework AGENTS.md (for agents working in this repo)
 
@@ -407,7 +411,100 @@ async function main() {
       break;
     }
 
+    case 'serve': { serve(); break; }
+
     default: console.log(HELP); process.exit(1);
   }
+}
+
+/* ---------------- serve: app + local Copilot CLI bridge ---------------- */
+const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.mjs': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8',
+  '.json': 'application/json; charset=utf-8', '.md': 'text/markdown; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png', '.ico': 'image/x-icon', '.woff2': 'font/woff2' };
+function serve() {
+  const port = Number(flags.port) || 4317;
+  const defCwd = path.resolve(flags.cwd || process.cwd());
+  const bin = flags['copilot-bin'] || process.env.AIC_COPILOT_BIN || 'copilot';
+  // copilot is a Node script (#!/usr/bin/env node): make sure this Node is on its PATH
+  const env = Object.assign({}, process.env, { PATH: [path.dirname(process.execPath), process.env.PATH].filter(Boolean).join(path.delimiter) });
+  const origins = new Set([`http://127.0.0.1:${port}`, `http://localhost:${port}`]);
+  const hosts = new Set([`127.0.0.1:${port}`, `localhost:${port}`]);
+  const json = (res, code, obj) => { res.writeHead(code, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' }); res.end(JSON.stringify(obj)); };
+  const readBody = (req) => new Promise((resolve, reject) => {
+    let b = ''; req.setEncoding('utf8');
+    req.on('data', (d) => { b += d; if (b.length > 8 * 1024 * 1024) { reject(new Error('Body too large')); req.destroy(); } });
+    req.on('end', () => resolve(b)); req.on('error', reject);
+  });
+  let version = null;
+  const copilotVersion = () => version ? Promise.resolve(version) : new Promise((resolve) => {
+    const p = spawn(bin, ['--version'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
+    let out = ''; p.stdout.on('data', (d) => { out += d; });
+    p.on('error', () => resolve(null));
+    p.on('close', (code) => { version = code === 0 ? out.split('\n')[0].trim() : null; resolve(version); });
+  });
+
+  const server = http.createServer(async (req, res) => {
+    // Only this origin may use the bridge: blocks DNS rebinding and other websites calling localhost
+    if (!hosts.has(req.headers.host || '')) return json(res, 403, { error: 'Forbidden host' });
+    const url = new URL(req.url, `http://${req.headers.host}`);
+    if (url.pathname.startsWith('/api/')) {
+      if (req.headers.origin && !origins.has(req.headers.origin)) return json(res, 403, { error: 'Forbidden origin' });
+      if (url.pathname === '/api/bridge' && req.method === 'GET') return json(res, 200, { ok: true, copilot: await copilotVersion(), cwd: defCwd });
+      if (url.pathname === '/api/copilot' && req.method === 'POST') {
+        if (!String(req.headers['content-type'] || '').startsWith('application/json')) return json(res, 415, { error: 'JSON required' });
+        let body;
+        try { body = JSON.parse(await readBody(req)); } catch (e) { return json(res, 400, { error: 'Invalid JSON' }); }
+        const cwd = path.resolve(defCwd, String(body.cwd || '.'));
+        if (!fs.existsSync(cwd) || !fs.statSync(cwd).isDirectory()) return json(res, 400, { error: 'Working folder not found: ' + cwd });
+        let prompt = String(body.prompt || '');
+        if (!prompt.trim()) return json(res, 400, { error: 'Empty prompt' });
+        const args = ['-s', '--no-ask-user'];
+        let tmp = null;
+        if (Buffer.byteLength(prompt) > 100000) {
+          tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'aic-'));
+          const pf = path.join(tmp, 'prompt.md');
+          fs.writeFileSync(pf, prompt);
+          prompt = `Read the file ${pf} completely and follow its instructions exactly. It is the full prompt for this step.`;
+          args.push('--add-dir', tmp);
+        }
+        args.unshift('-p', prompt);
+        if (body.allowAllTools) args.push('--allow-all-tools');
+        if (body.model) args.push('--model', String(body.model));
+        const t0 = Date.now();
+        console.log(c.m('◆') + ' ' + c.b(String(body.title || 'step')) + c.dim(` · copilot in ${cwd}${body.allowAllTools ? ' · all tools allowed' : ''}`));
+        const p = spawn(bin, args, { cwd, env, stdio: ['ignore', 'pipe', 'pipe'] });
+        let out = ''; let err = ''; let done = false;
+        p.stdout.on('data', (d) => { out += d; if (flags.verbose) process.stdout.write(c.dim(String(d))); });
+        p.stderr.on('data', (d) => { err += d; });
+        res.on('close', () => { if (!done) { p.kill('SIGTERM'); console.log(c.y('  ⏹ cancelled by the app')); } });
+        p.on('error', (e) => { done = true; json(res, 500, { error: e.code === 'ENOENT' ? `«${bin}» not found in PATH` : e.message }); });
+        p.on('close', (code) => {
+          if (done) return;
+          done = true;
+          if (tmp) fs.rmSync(tmp, { recursive: true, force: true });
+          const secs = ((Date.now() - t0) / 1000).toFixed(1);
+          if (code === 0) { console.log(c.g('  ✔') + c.dim(` ${secs}s`)); json(res, 200, { output: out.trim(), warnings: err.trim() || undefined }); }
+          else { console.log(c.r(`  ✖ exit ${code}`)); json(res, 502, { error: `copilot exited with code ${code}: ${(err || out).slice(-800)}` }); }
+        });
+        return;
+      }
+      return json(res, 404, { error: 'Not found' });
+    }
+    // static files
+    let rel = decodeURIComponent(url.pathname);
+    if (rel.endsWith('/')) rel += 'index.html';
+    const file = path.resolve(ROOT, '.' + rel);
+    if (!file.startsWith(ROOT + path.sep) || file.split(path.sep).includes('.git')) { res.writeHead(403); return res.end('Forbidden'); }
+    fs.readFile(file, (e, data) => {
+      if (e) { res.writeHead(404); return res.end('Not found'); }
+      res.writeHead(200, { 'content-type': MIME[path.extname(file).toLowerCase()] || 'application/octet-stream', 'cache-control': 'no-cache' });
+      res.end(data);
+    });
+  });
+  server.listen(port, '127.0.0.1', async () => {
+    const v = await copilotVersion();
+    console.log(`\n${c.b('AI Center')} → ${c.cy(`http://localhost:${port}`)}`);
+    console.log(c.dim(`  Copilot CLI bridge: ${v || c.r('copilot not found (npm install -g @github/copilot)')} · working folder ${defCwd}`));
+    console.log(c.dim('  Runner → engine «Copilot CLI». Ctrl+C to stop.\n'));
+  });
 }
 main().catch((e) => { console.error(c.r('✖ ' + (e.stack || e.message))); process.exit(1); });

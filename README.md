@@ -74,6 +74,7 @@ Create each item from **+ New**. The **Health** view warns you about broken refe
 
 - **Import what you already have**: **+ New → Import files…** brings in prompts, agents and instructions you already use in Copilot (`.github/…`, `.chatmode.md`, `SKILL.md`, Cursor rules). Variables are converted automatically.
 - **Workflows with AI**: **New workflow → Design with AI** — describe the process and Copilot or Claude proposes the flow using your pieces.
+- **Everything else with AI**: the **✨ Generate with AI** button in the editor writes a prompt, agent, skill, instruction, knowledge document or MCP server from a description, or improves the current one (**Improve with AI**). Engines: Copilot CLI (with `node cli/aic.mjs serve`), Anthropic, OpenAI-compatible, Azure OpenAI or manual copy/paste. Nothing is saved until you click Save.
 - **Polish existing prompts**: keep the `improve-prompt` prompt before emptying the library and use it to clean up the loose prompts people already have.
 - **From the terminal**: `new` creates items from a template, for example:
 
@@ -121,6 +122,10 @@ Full specification: [docs/FORMAT.md](docs/FORMAT.md).
 CLI providers: `manual` · `copilot` (Copilot CLI, runs tools in your repo) · `claude-code` · `anthropic` · `github` (GitHub Models) · `openai` · `azure` · `ollama`.
 
 ## Using it with GitHub Copilot CLI
+
+**In the app**: start it with `node cli/aic.mjs serve [--cwd <repo>]` and open `http://localhost:4317`. The **🐙 GitHub Copilot CLI** engine then runs workflows (Runner) and generates workflows, prompts, agents, skills… (**Generate with AI**) with your logged-in `copilot`. Use `--copilot-bin <path>` if `copilot` is not the one in your PATH.
+
+**In your repositories**:
 
 `node cli/aic.mjs export copilot --out ../my-repo` generates everything Copilot CLI reads:
 

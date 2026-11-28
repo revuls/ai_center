@@ -572,6 +572,65 @@
     const m = String(text).match(/window\.AIC_BUNDLE\s*=\s*([\s\S]*);\s*$/);
     return JSON.parse(m ? m[1] : text);
   }
+  /**
+   * Parses JSON pasted from an AI chat or terminal. Tolerates: text or code fences around it,
+   * braces in that text ({{var}}), lines wrapped inside strings (terminal copy), non-breaking
+   * spaces, smart quotes, line and block comments and trailing commas.
+   */
+  function parseLooseJson(text) {
+    let src = String(text || '').replace(/^﻿/, '').replace(/[​-‍⁠]/g, '').replace(/[   ]/g, ' ').replace(/\r\n?/g, '\n');
+    const fence = src.match(/```(?:json|jsonc)?[ \t]*\n([\s\S]*?)\n[ \t]*```/i);
+    if (fence && /^\s*[{[]/.test(fence[1])) src = fence[1];
+    // Candidate starts: an object opening with a key (skips "{{var}}" and "{changes}" in the surrounding prose)
+    const starts = [];
+    const re = /\{(?=\s*["“])/g; let m;
+    while ((m = re.exec(src))) starts.push(m.index);
+    if (!starts.length) throw new Error('No JSON object found in the text');
+    let firstErr = null;
+    for (const smart of [false, true]) {
+      const body = smart ? src.replace(/[“”„]/g, '"') : src;
+      for (const st of starts.slice(0, 20)) {
+        const cand = repairJson(body, st);
+        if (!cand) break; // unbalanced: it runs to the end of the text, so later candidates are just pieces of it
+        try { return JSON.parse(cand); } catch (e) { if (!firstErr) firstErr = e; }
+      }
+    }
+    throw firstErr || new Error('Incomplete JSON: check that it was copied entirely');
+  }
+  /** From `start`, returns the balanced JSON value with comments, raw line breaks in strings and trailing commas fixed (or null). */
+  function repairJson(src, start) {
+    let out = ''; let depth = 0; let inStr = false; let esc = false;
+    for (let i = start; i < src.length; i++) {
+      const ch = src[i];
+      if (inStr) {
+        if (esc) { out += ch; esc = false; continue; }
+        if (ch === '\\') { out += ch; esc = true; continue; }
+        if (ch === '"') { inStr = false; out += ch; continue; }
+        if (ch === '\n') {
+          // wrapped line inside a string: join with a space, dropping the indentation of the next line
+          while (src[i + 1] === ' ' || src[i + 1] === '\t') i++;
+          if (!/\s$/.test(out)) out += ' ';
+          continue;
+        }
+        if (ch === '\t') { out += ' '; continue; }
+        if (ch < ' ') continue;
+        out += ch; continue;
+      }
+      if (ch === '"') { inStr = true; out += ch; continue; }
+      if (ch === '/' && src[i + 1] === '/') { while (i < src.length && src[i] !== '\n') i++; continue; }
+      if (ch === '/' && src[i + 1] === '*') { const e = src.indexOf('*/', i + 2); if (e < 0) return null; i = e + 1; continue; }
+      if (ch === '{' || ch === '[') depth++;
+      if (ch === '}' || ch === ']') {
+        out = out.replace(/,\s*$/, '');
+        depth--;
+        out += ch;
+        if (depth === 0) return out;
+        continue;
+      }
+      out += ch;
+    }
+    return null;
+  }
   function sortItems(items) {
     return items.slice().sort((a, b) => (TYPE_ORDER.indexOf(a.type) - TYPE_ORDER.indexOf(b.type)) || String(a.name).localeCompare(String(b.name), 'en'));
   }
@@ -1114,6 +1173,7 @@
             step.output = await hooks.llm(composed, { node, step, run, kind: 'end' });
           } else {
             step.output = run.steps.filter((s) => s.type === 'step' && s.output).map((s) => `## ${s.title}\n\n${s.output}`).join('\n\n');
+            step.auto = true; // just the step outputs joined: the report does not repeat it
           }
           run.final = step.output;
         } else {
@@ -1162,12 +1222,20 @@
       `- **Status**: ${run.status}`, `- **Started**: ${run.startedAt}`, `- **Finished**: ${run.finishedAt || '—'}`, ''];
     const ins = Object.keys(run.inputs || {});
     if (ins.length) { lines.push('## Inputs', ''); ins.forEach((k) => lines.push(`- **${k}**: ${inputText(run.inputs[k])}`)); lines.push(''); }
+    // An End step without its own prompt only joins the step outputs (older runs have no `auto` flag)
+    const joined = run.steps.filter((s) => s.type === 'step' && s.output).map((s) => `## ${s.title}\n\n${s.output}`).join('\n\n');
+    const isJoin = (s) => s.type === 'end' && (s.auto || String(s.output || '') === joined);
+    const hasFinal = !!run.final && !run.steps.some((s) => isJoin(s) && s.output === run.final);
     lines.push('## Steps', '');
     run.steps.forEach((s, i) => {
       lines.push(`### ${i + 1}. ${s.title}${s.attempt > 1 ? ` (attempt ${s.attempt})` : ''}`, '');
       lines.push(`_${(NODE_TYPES[s.type] || {}).label || s.type} · ${s.status}${s.decision ? ' · decision: ' + s.decision : ''}_`, '');
-      if (s.notes) lines.push(`> ${s.notes}`, '');
-      if (s.output && s.type !== 'start') lines.push(String(s.output).trim(), '');
+      const out = String(s.output || '').trim();
+      if (s.notes && !out.includes(String(s.notes).trim())) lines.push(`> ${s.notes}`, '');
+      if (s.type === 'end') {
+        if (isJoin(s)) lines.push('The deliverables are the outputs of the steps above.', '');
+        else if (hasFinal && out) lines.push('See **Final result** below.', '');
+      } else if (out && s.type !== 'start') lines.push(demote(out), '');
       if (s.error) lines.push(`**Error:** ${s.error}`, '');
     });
     const all = runFiles(run);
@@ -1182,8 +1250,22 @@
       missing.forEach((s) => s.missingFiles.forEach((p) => lines.push(`- \`${p}\` — ${s.title}`)));
       lines.push('');
     }
-    if (run.final) lines.push('## Final result', '', run.final, '');
+    if (hasFinal) lines.push('## Final result', '', demote(String(run.final).trim(), 2), '');
     return lines.join('\n');
+  }
+  /** Shifts Markdown headings so AI outputs nest under the report headings (min level `min + 1`). */
+  function demote(text, min = 3) {
+    let inFence = false;
+    const lines = String(text).split('\n');
+    const levels = lines.filter((l) => { if (/^\s*(```|~~~)/.test(l)) inFence = !inFence; return !inFence && /^#{1,6}\s/.test(l); }).map((l) => l.match(/^#+/)[0].length);
+    if (!levels.length) return text;
+    const shift = Math.max(0, min + 1 - Math.min(...levels));
+    if (!shift) return text;
+    inFence = false;
+    return lines.map((l) => {
+      if (/^\s*(```|~~~)/.test(l)) { inFence = !inFence; return l; }
+      return !inFence && /^#{1,6}\s/.test(l) ? '#'.repeat(Math.min(6, l.match(/^#+/)[0].length + shift)) + l.replace(/^#+/, '') : l;
+    }).join('\n');
   }
 
   /* ------------------------------------------------------------------ *
@@ -1760,7 +1842,7 @@
     pathFor, classifyPath, itemFromFile, itemToFile, normalizeItem, newItem,
     libraryFromFiles, libraryToFiles, serializeBundle, parseBundle, sortItems, indexLib, usagesOf,
     extractVars, render, convertVars,
-    wfMaps, startNodes, backEdges, linearize, autoLayout, reachable, isReject, nodeLabel,
+    parseLooseJson, wfMaps, startNodes, backEdges, linearize, autoLayout, reachable, isReject, nodeLabel,
     resolveNode, composeStep, composeAgent, runWorkflow, runReport, runFiles,
     safeRelPath, nodeFiles, extractFiles,
     RESOURCE_MAX_BYTES, isBinary, b64ToBytes, bytesToB64, contentFromBytes, contentToData, contentSize, isExecutable, skillResources,

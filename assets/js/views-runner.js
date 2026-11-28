@@ -10,14 +10,28 @@
 
   const PROVIDERS = [
     { value: 'manual', label: '✋ Manual (copy and paste)', desc: 'Works with Copilot M365, Copilot Chat, ChatGPT, Claude… You copy each step\'s prompt, paste the answer and the flow continues.' },
+    { value: 'copilot-cli', label: '🐙 GitHub Copilot CLI', desc: 'Runs each step with your logged-in Copilot CLI on this machine (agents, skills, tools). Needs the app served by node cli/aic.mjs serve.' },
     { value: 'simulate', label: '🧪 Simulation', desc: 'Walks the flow with sample outputs to validate the design without spending tokens.' },
     { value: 'anthropic', label: '🟣 Anthropic API', desc: 'Calls Claude directly from the browser with your key.' },
     { value: 'openai', label: '🟢 OpenAI-compatible', desc: 'OpenAI, GitHub Models, Ollama, LM Studio, vLLM… (base URL + key).' },
     { value: 'azure', label: '🔷 Azure OpenAI', desc: 'Endpoint + deployment of your Azure OpenAI resource.' }
   ];
 
+  const AGENTIC_NOTE = '\n\n---\nYou are working inside the current repository and can use your tools (read/edit files, run commands). When you finish this step, answer with the complete step deliverable in Markdown.';
+  async function bridgeInfo() {
+    try { const r = await fetch('/api/bridge', { cache: 'no-store' }); return r.ok ? await r.json() : null; } catch (e) { return null; }
+  }
   async function callLLM(cfg, composed, signal) {
     const p = cfg.provider;
+    if (p === 'copilot-cli') {
+      const r = await fetch('/api/copilot', {
+        method: 'POST', signal, headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ title: composed.title, prompt: composed.full + (cfg.allowAllTools ? AGENTIC_NOTE : ''), cwd: cfg.cwd || undefined, model: cfg.model || undefined, allowAllTools: !!cfg.allowAllTools })
+      }).catch((e) => { if (e.name === 'AbortError') throw e; throw new Error('Copilot CLI bridge not reachable: start the app with `node cli/aic.mjs serve`'); });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(d.error || 'HTTP ' + r.status);
+      return d.output;
+    }
     if (p === 'anthropic') {
       const r = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST', signal,
@@ -67,7 +81,7 @@
     root.append(page);
     let sess = null;
     if (!wf) { page.append(h('div', { class: 'card empty' }, h('div', { class: 'e-ico' }, '🔎'), 'Workflow not found.', h('div', { style: { marginTop: '10px' } }, btn('View workflows', () => go('#/library/workflow'))))); return; }
-    const cfg = Object.assign({ provider: 'manual', model: '', baseUrl: '', apiKey: '', apiVersion: '2024-10-21', remember: false }, S.prefs.llm);
+    const cfg = Object.assign({ provider: 'manual', model: '', baseUrl: '', apiKey: '', apiVersion: '2024-10-21', remember: false, cwd: '', allowAllTools: false }, S.prefs.llm);
     const inputs = {};
     let autoApprove = false;
     let workspace = null; // picked folder for step context files: [{path, file}]
@@ -141,6 +155,22 @@
             h('input', { type: 'password', value: cfg.apiKey, autocomplete: 'off', placeholder: 'Stays in this browser', oninput: (e) => { cfg.apiKey = e.target.value; } }),
             h('label', { class: 'check small', style: { marginTop: '6px' } }, h('input', { type: 'checkbox', checked: cfg.remember, onchange: (e) => { cfg.remember = e.target.checked; } }), 'Remember the key in this browser (never stored in files)')));
           cfgBox.append(h('div', { class: 'callout small' }, '🔐', h('div', null, 'The call goes straight from your browser to the provider. If the provider blocks CORS, use the CLI: ', h('code', null, `node cli/aic.mjs run ${wf.id}`), '.')));
+        }
+        if (p === 'copilot-cli') {
+          const st = h('div', { class: 'callout small' }, h('span', { class: 'spinner' }), h('div', null, 'Checking the Copilot CLI bridge…'));
+          cfgBox.append(st);
+          bridgeInfo().then((b) => {
+            st.innerHTML = '';
+            if (b && b.copilot) { st.className = 'callout ok small'; st.append('✅', h('div', null, h('b', null, b.copilot), ' · working folder ', h('code', null, b.cwd))); }
+            else if (b) { st.className = 'callout err small'; st.append('⛔', h('div', null, 'The bridge is running but ', h('code', null, 'copilot'), ' was not found. Install it: ', h('code', null, 'npm install -g @github/copilot'), ' and log in with ', h('code', null, '/login'), '.')); }
+            else { st.className = 'callout err small'; st.append('⛔', h('div', null, 'Bridge not available. Open the app with ', h('code', null, 'node cli/aic.mjs serve --cwd <your repo>'), ' and use the URL it prints.')); }
+          });
+          cfgBox.append(h('div', { class: 'field', style: { marginTop: '10px' } }, h('div', { class: 'lbl' }, 'Working folder'),
+            h('input', { type: 'text', value: cfg.cwd, placeholder: 'Default: the --cwd of serve (relative paths resolve from it)', oninput: (e) => { cfg.cwd = e.target.value; } })));
+          cfgBox.append(h('div', { class: 'field' }, h('div', { class: 'lbl' }, 'Model (optional)'),
+            h('input', { type: 'text', value: cfg.model, placeholder: 'Default model of your Copilot CLI · auto', oninput: (e) => { cfg.model = e.target.value; } })));
+          cfgBox.append(h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: cfg.allowAllTools, onchange: (e) => { cfg.allowAllTools = e.target.checked; } }),
+            'Let Copilot use all tools (edit files, run commands) in the working folder'));
         }
         if (p !== 'manual') cfgBox.append(h('label', { class: 'check', style: { marginTop: '10px' } }, h('input', { type: 'checkbox', checked: autoApprove, onchange: (e) => { autoApprove = e.target.checked; } }), 'Approve human reviews automatically'));
       };
@@ -238,7 +268,7 @@
             setTimeout(() => out.focus(), 30);
             return waitUser();
           }
-          const panel = h('div', { class: 'card card-pad' }, h('div', { class: 'row' }, h('span', { class: 'spinner' }), h('b', null, composed.title), h('span', { class: 'muted small' }, ' · calling ' + cfg.provider + '…')), h('div', { style: { marginTop: '10px' } }, promptBox(composed)));
+          const panel = h('div', { class: 'card card-pad' }, h('div', { class: 'row' }, h('span', { class: 'spinner' }), h('b', null, composed.title), h('span', { class: 'muted small' }, cfg.provider === 'copilot-cli' ? ' · Copilot CLI working…' : ' · calling ' + cfg.provider + '…')), h('div', { style: { marginTop: '10px' } }, promptBox(composed)));
           setPanel(panel);
           return callLLM(cfg, composed, ctrl.signal);
         },

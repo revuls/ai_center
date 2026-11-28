@@ -79,7 +79,8 @@ A workflow is a **graph** of connected nodes. You design it by dragging pieces o
 - **Click** a palette piece → it is added **after the selected node** and connected automatically.
 - Connect by dragging from a node's right **●** dot to another node.
 - **Arrange** lays out the graph automatically. **⌘Z** undoes.
-- **Design with AI**: describe the process, copy the prompt into Copilot/Claude and paste the resulting JSON.
+- **Design with AI**: describe the process and click **Generate with AI** (Copilot CLI via `node cli/aic.mjs serve`, or an API key), or copy the prompt into any AI and paste the resulting JSON.
+- **Generate with AI** also works for prompts, agents, skills, instructions, knowledge and MCP servers: the button in the editor writes a new item or improves the current one. You review it before saving.
 
 ## Variables
 

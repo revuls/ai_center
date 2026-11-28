@@ -288,6 +288,10 @@
     if (id && !existing) { root.append(h('div', { class: 'page' }, h('div', { class: 'card empty' }, h('div', { class: 'e-ico' }, '🔎'), 'No existe ', h('code', null, type + ':' + id), h('div', { style: { marginTop: '10px' } }, btn('Back', () => go('#/library/' + type)))))); return; }
     let draft = existing ? C.clone(existing) : C.newItem(type, { body: TEMPLATES[type] || '', author: S.prefs.author, area: S.prefs.area, targets: (S.lib.config.defaultTargets || []).slice() });
     if (existing && existing._files) draft._files = Object.assign({}, existing._files);
+    // A draft generated with AI re-renders the editor with the new content (still unsaved)
+    const aiDraft = V._aiDraft && V._aiDraft.type === type && V._aiDraft.id === (id || null) ? V._aiDraft.draft : null;
+    V._aiDraft = null;
+    if (aiDraft) draft = aiDraft;
     const prevKey = existing ? S.keyOf(existing) : null;
     let dirty = false; let idTouched = !!existing;
     const T = C.TYPES[type];
@@ -339,7 +343,14 @@
       await S.remove(existing); dirty = false; toast('Deleted'); go('#/library/' + type);
     };
 
-    const useActions = [];
+    const aiBtn = btn(existing || aiDraft ? 'Improve with AI' : 'Generate with AI', () => AIC.ai.generateItem(type, draft, (patch) => {
+      const next = Object.assign(C.clone(Object.assign({}, draft, { _files: undefined })), patch);
+      if (draft._files) next._files = Object.assign({}, draft._files);
+      if (!existing && !idTouched) next.id = S.uniqueId(type, next.name);
+      V._aiDraft = { type, id: id || null, draft: next };
+      AIC.app.route();
+    }), { icon: 'sparkle', title: 'Write or rewrite this ' + T.singular.toLowerCase() + ' with an AI engine (Copilot CLI, API or copy/paste)' });
+    const useActions = [aiBtn];
     if (type === 'prompt') useActions.push(btn('Use', () => V.usePrompt(draft), { icon: 'play', cls: 'primary' }));
     if (type === 'agent') useActions.push(btn('Use / deploy', (e) => V.useAgent(draft, e.currentTarget), { icon: 'play' }));
 
@@ -421,6 +432,7 @@
     root.append(page);
     if (!existing) setTimeout(() => nameIn.focus(), 0);
     AIC.app.dirty = () => dirty;
+    if (aiDraft) markDirty();
     const onKey = (e) => { if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 's') { e.preventDefault(); save(); } };
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
