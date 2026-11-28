@@ -79,7 +79,7 @@ A workflow is a **graph** of connected nodes. You design it by dragging pieces o
 - **Click** a palette piece → it is added **after the selected node** and connected automatically.
 - Connect by dragging from a node's right **●** dot to another node.
 - **Arrange** lays out the graph automatically. **⌘Z** undoes.
-- **Design with AI**: describe the process and click **Generate with AI** (Copilot CLI via `node cli/aic.mjs serve`, or an API key), or copy the prompt into any AI and paste the resulting JSON.
+- **Design with AI**: describe the process and click **Generate with AI** (Copilot CLI, Claude Code or Codex via \`node cli/aic.mjs serve\`, or an API key), or copy the prompt into any AI and paste the resulting JSON.
 - **Generate with AI** also works for prompts, agents, skills, instructions, knowledge and MCP servers: the button in the editor writes a new item or improves the current one. You review it before saving.
 
 ## Variables
@@ -111,7 +111,8 @@ Unsafe paths (absolute or with \`..\`) are always ignored, and declared files th
 | Where | How | Best for |
 |---|---|---|
 | **App · Manual** | You copy each step's prompt to your AI and paste the answer | Copilot M365, Copilot Chat, any AI without an API |
-| **App · API** | Anthropic, OpenAI-compatible (GitHub Models, Ollama…), Azure OpenAI | Automatic execution with on-screen human reviews |
+| **App · your subscription** | Copilot CLI, Claude Code or Codex CLI through \`node cli/aic.mjs serve\` | Automatic execution with your plan (no API billing) and on-screen human reviews |
+| **App · API** | Anthropic, OpenAI-compatible (OpenAI, Ollama…), Azure OpenAI | Automatic execution with on-screen human reviews |
 | **App · Simulation** | Sample outputs | Validating the design |
 | **Copilot (agent mode)** | Export and type \`/wf-<id>\` in the chat | IDE development with real tools |
 | **Copilot coding agent / CLI** | "Run the workflow in \`.github/prompts/wf-<id>.prompt.md\`" | Autonomous work on issues |

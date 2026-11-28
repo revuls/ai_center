@@ -139,15 +139,65 @@ async function readMultiline(prompt) {
 }
 
 /* ---------------- LLM providers ---------------- */
-function runProc(bin, args, opts) {
+function runProc(bin, args, opts, input) {
   return new Promise((resolve, reject) => {
-    const p = spawn(bin, args, Object.assign({ stdio: ['ignore', 'pipe', 'pipe'] }, opts));
+    const p = spawn(bin, args, Object.assign({ stdio: [input !== undefined ? 'pipe' : 'ignore', 'pipe', 'pipe'] }, opts));
+    if (input !== undefined) p.stdin.end(input);
     let out = ''; let err = '';
     p.stdout.on('data', (d) => { out += d; if (flags.verbose) process.stdout.write(c.dim(String(d))); });
     p.stderr.on('data', (d) => { err += d; });
     p.on('error', (e) => reject(e.code === 'ENOENT' ? new Error(`«${bin}» not found in PATH`) : e));
     p.on('close', (code) => code === 0 ? resolve(out.trim()) : reject(new Error(`${bin} exited with code ${code}: ${err.slice(-600)}`)));
   });
+}
+/* ---------------- agent CLIs (your subscription, no API billing) ---------------- */
+/** Copilot CLI, Claude Code and Codex in non-interactive mode, signed in with the user's own account. */
+const AGENT_CLIS = {
+  copilot: { label: 'GitHub Copilot CLI', bin: () => flags['copilot-bin'] || process.env.AIC_COPILOT_BIN || 'copilot', apiKeys: [], install: 'npm install -g @github/copilot (then /login)' },
+  claude: { label: 'Claude Code', bin: () => flags['claude-bin'] || process.env.AIC_CLAUDE_BIN || 'claude', apiKeys: ['ANTHROPIC_API_KEY', 'ANTHROPIC_AUTH_TOKEN'], install: 'npm install -g @anthropic-ai/claude-code (then run claude and /login with your Pro/Max/Ultra plan)' },
+  codex: { label: 'Codex CLI', bin: () => flags['codex-bin'] || process.env.AIC_CODEX_BIN || 'codex', apiKeys: ['CODEX_API_KEY', 'OPENAI_API_KEY'], install: 'npm install -g @openai/codex (then codex login, «Sign in with ChatGPT»)' }
+};
+/** Environment for agent CLIs: this Node on PATH (they are Node scripts) and, unless --use-api-keys, no API keys so they use the subscription login. */
+function agentEnv(kind) {
+  const env = Object.assign({}, process.env, { PATH: [path.dirname(process.execPath), process.env.PATH].filter(Boolean).join(path.delimiter) });
+  if (!flags['use-api-keys']) AGENT_CLIS[kind].apiKeys.forEach((k) => { delete env[k]; });
+  return env;
+}
+/**
+ * Builds a non-interactive call. allowAll = let the agent edit files and run commands in cwd.
+ * Prompts over ~100 KB go through a temp file (argv strings are capped at ~128 KB on Linux).
+ */
+function agentInvocation(kind, { system, prompt, model, allowAll, extra }) {
+  const full = system ? `${system}\n\n---\n\n${prompt}` : prompt;
+  const args = []; let input; let tmp = null;
+  const viaFile = (text) => {
+    tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'aic-'));
+    const pf = path.join(tmp, 'prompt.md');
+    fs.writeFileSync(pf, text);
+    return { file: pf, msg: `Read the file ${pf} completely and follow its instructions exactly. It is the full prompt for this step.` };
+  };
+  if (kind === 'copilot') {
+    let p = full;
+    if (Buffer.byteLength(p) > 100000) { const f = viaFile(p); p = f.msg; args.push('--add-dir', tmp); }
+    args.unshift('-p', p);
+    args.push('-s', '--no-ask-user');
+    if (allowAll) args.push('--allow-all-tools');
+  } else if (kind === 'claude') {
+    if (Buffer.byteLength(full) > 100000) { const f = viaFile(full); args.push('-p', f.msg, '--add-dir', tmp); }
+    else { args.push('-p', prompt); if (system) args.push('--append-system-prompt', system); }
+    args.push('--output-format', 'text');
+    // dontAsk: anything that would need approval is denied (reading is fine) · acceptEdits + Bash: edits and commands
+    if (allowAll) args.push('--permission-mode', 'acceptEdits', '--allowedTools', 'Bash');
+    else args.push('--permission-mode', 'dontAsk');
+  } else if (kind === 'codex') {
+    // exec prints only the final message on stdout (progress goes to stderr); the prompt comes from stdin
+    args.push('exec', '--skip-git-repo-check', '--color', 'never', '--sandbox', allowAll ? 'workspace-write' : 'read-only');
+    input = full;
+  } else throw new Error('Unknown agent CLI: ' + kind);
+  if (model) args.push(kind === 'codex' ? '-m' : '--model', model);
+  if (extra && extra.length) args.push(...extra);
+  if (kind === 'codex') args.push('-');
+  return { bin: AGENT_CLIS[kind].bin(), args, input, env: agentEnv(kind), cleanup: () => { if (tmp) fs.rmSync(tmp, { recursive: true, force: true }); } };
 }
 const AGENTIC_NOTE = '\n\n---\nYou are working inside the current repository and can use your tools (read/edit files, run commands). When you finish this step, answer with the complete step deliverable in Markdown.';
 function makeLLM(provider, runDir) {
@@ -172,7 +222,7 @@ function makeLLM(provider, runDir) {
         if (!r.ok) throw new Error(d.error ? d.error.message : 'HTTP ' + r.status);
         return d.content.filter((x) => x.type === 'text').map((x) => x.text).join('\n');
       }
-      case 'openai': case 'github': case 'ollama': case 'azure': {
+      case 'openai': case 'ollama': case 'azure': {
         let url; const headers = { 'content-type': 'application/json' }; const body = { messages: [{ role: 'system', content: composed.system }, { role: 'user', content: composed.user }] };
         if (provider === 'azure') {
           const ep = process.env.AZURE_OPENAI_ENDPOINT || die('Missing AZURE_OPENAI_ENDPOINT');
@@ -180,43 +230,27 @@ function makeLLM(provider, runDir) {
           url = `${ep.replace(/\/$/, '')}/openai/deployments/${dep}/chat/completions?api-version=${process.env.AZURE_OPENAI_API_VERSION || '2024-10-21'}`;
           headers['api-key'] = process.env.AZURE_OPENAI_API_KEY || die('Missing AZURE_OPENAI_API_KEY');
         } else {
-          const base = provider === 'github' ? 'https://models.github.ai/inference' : provider === 'ollama' ? (process.env.OLLAMA_BASE_URL || 'http://localhost:11434/v1') : (process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1');
+          const base = provider === 'ollama' ? (process.env.OLLAMA_BASE_URL || 'http://localhost:11434/v1') : (process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1');
           url = base.replace(/\/$/, '') + '/chat/completions';
-          const key = provider === 'github' ? (process.env.GITHUB_TOKEN || die('Missing GITHUB_TOKEN (with models:read permission)')) : provider === 'openai' ? (process.env.OPENAI_API_KEY || '') : '';
+          const key = provider === 'openai' ? (process.env.OPENAI_API_KEY || '') : '';
           if (key) headers.Authorization = 'Bearer ' + key;
-          body.model = model || (provider === 'github' ? 'openai/gpt-4.1' : provider === 'ollama' ? 'llama3.1' : (process.env.OPENAI_MODEL || 'gpt-4.1'));
+          body.model = model || (provider === 'ollama' ? 'llama3.1' : (process.env.OPENAI_MODEL || 'gpt-4.1'));
         }
         const r = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body) });
         const d = await r.json().catch(() => ({}));
         if (!r.ok) throw new Error((d.error && (d.error.message || JSON.stringify(d.error))) || 'HTTP ' + r.status);
         return d.choices[0].message.content;
       }
-      case 'copilot': {
-        // Copilot CLI programmatic mode: -p <prompt>, -s = print only the agent's answer, --no-ask-user = never block on questions
-        const extra = (process.env.AIC_COPILOT_ARGS || '--allow-all-tools').split(/\s+/).filter(Boolean);
-        let prompt = composed.full + AGENTIC_NOTE;
-        const args = [];
-        if (Buffer.byteLength(prompt) > 100000) {
-          // A single argv string is capped (~128 KB on Linux): hand over the prompt as a file instead
-          const pf = path.join(runDir, `${tag}-${C.slugify(composed.title)}.copilot-prompt.md`);
-          fs.writeFileSync(pf, prompt);
-          prompt = `Read the file ${pf} completely and follow its instructions exactly. It is the full prompt for this step.`;
-          args.push('--add-dir', runDir);
-        }
-        args.unshift('-p', prompt);
-        if (!extra.includes('-s') && !extra.includes('--silent') && !extra.includes('--output-format')) args.push('-s');
-        if (!extra.includes('--no-ask-user')) args.push('--no-ask-user');
-        args.push(...extra);
-        if (model) args.push('--model', model);
-        return runProc(process.env.AIC_COPILOT_BIN || 'copilot', args, { cwd: flags.cwd ? path.resolve(flags.cwd) : process.cwd() });
+      case 'copilot': case 'claude-code': case 'codex': {
+        const kind = provider === 'claude-code' ? 'claude' : provider;
+        const envArgs = process.env[{ copilot: 'AIC_COPILOT_ARGS', claude: 'AIC_CLAUDE_ARGS', codex: 'AIC_CODEX_ARGS' }[kind]];
+        const inv = agentInvocation(kind, { system: composed.system, prompt: composed.user + AGENTIC_NOTE, model,
+          allowAll: envArgs === undefined, extra: envArgs ? envArgs.split(/\s+/).filter(Boolean) : [] });
+        try { return await runProc(inv.bin, inv.args, { cwd: flags.cwd ? path.resolve(flags.cwd) : process.cwd(), env: inv.env }, inv.input); }
+        finally { inv.cleanup(); }
       }
-      case 'claude-code': {
-        const extra = (process.env.AIC_CLAUDE_ARGS || '--permission-mode acceptEdits').split(/\s+/).filter(Boolean);
-        const args = ['-p', composed.user + AGENTIC_NOTE, '--append-system-prompt', composed.system, '--output-format', 'text', ...extra];
-        if (model) args.push('--model', model);
-        return runProc(process.env.AIC_CLAUDE_BIN || 'claude', args, { cwd: flags.cwd ? path.resolve(flags.cwd) : process.cwd() });
-      }
-      default: die('Unknown provider: ' + provider + ' (manual|anthropic|openai|github|azure|ollama|copilot|claude-code)');
+      case 'github': die('GitHub Models was retired by GitHub on 2026-07-30. Use --provider copilot (your Copilot plan gives access to GPT and Claude models).');
+      default: die('Unknown provider: ' + provider + ' (manual|copilot|claude-code|codex|anthropic|openai|azure|ollama)');
     }
   };
 }
@@ -240,10 +274,13 @@ ${c.b('Usage')}  node cli/aic.mjs <command> [options]
                                    File/folder inputs: --input spec=@docs/spec.md · --input refs=@docs/
                                    Step context files are read from --context-dir (default --cwd or .);
                                    agentic providers read them themselves (force with --inline-context)
-                                   Providers: manual (default) · copilot (Copilot CLI) · claude-code · anthropic
-                                              github (GitHub Models) · openai · azure · ollama
-  ${c.cy('serve')} [--port 4317] [--cwd dir]       Serve the app on localhost with a Copilot CLI bridge: the Runner's
-                                   «Copilot CLI» engine runs each step with your logged-in \`copilot\` in --cwd
+                                   Providers: manual (default) · copilot (Copilot CLI) · claude-code · codex
+                                              anthropic · openai · azure · ollama
+                                   copilot/claude-code/codex use your subscription login (API keys in the
+                                   environment are ignored unless --use-api-keys)
+  ${c.cy('serve')} [--port 4317] [--cwd dir]       Serve the app on localhost with a bridge to your agent CLIs (Copilot CLI,
+                                   Claude Code, Codex): the app runs and generates with your subscription login.
+                                   --copilot-bin/--claude-bin/--codex-bin <path> · --use-api-keys to keep API keys
   ${c.cy('new')} <type> "<name>"               Create an item from a template
   ${c.cy('agents-md')}                        Regenerate the framework AGENTS.md (for agents working in this repo)
 
@@ -254,7 +291,7 @@ ${c.b('Global options')}
 ${c.b('Examples')}
   node cli/aic.mjs export copilot --out ../my-repo
   node cli/aic.mjs run feature-e2e --input idea="Export invoices to PDF" --provider copilot --cwd ../my-repo
-  GITHUB_TOKEN=… node cli/aic.mjs run bugfix --provider github --auto-approve
+  node cli/aic.mjs run bugfix --input symptoms="…" --provider codex --auto-approve
 `;
 
 async function main() {
@@ -326,7 +363,7 @@ async function main() {
         }
       }
       for (const k of Object.keys(inputs)) if (typeof inputs[k] === 'string' && inputs[k].startsWith('@') && !wf.inputs.some((i) => i.name === k)) inputs[k] = readInputPath(inputs[k], { name: k });
-      const agentic = ['copilot', 'claude-code'].includes(flags.provider);
+      const agentic = ['copilot', 'claude-code', 'codex'].includes(flags.provider);
       const ctxBase = path.resolve(flags['context-dir'] || flags.cwd || '.');
       const provider = flags.provider || 'manual';
       const runsDir = path.resolve(flags.runs || path.join(ROOT, 'runs'));
@@ -423,9 +460,7 @@ const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; cha
 function serve() {
   const port = Number(flags.port) || 4317;
   const defCwd = path.resolve(flags.cwd || process.cwd());
-  const bin = flags['copilot-bin'] || process.env.AIC_COPILOT_BIN || 'copilot';
-  // copilot is a Node script (#!/usr/bin/env node): make sure this Node is on its PATH
-  const env = Object.assign({}, process.env, { PATH: [path.dirname(process.execPath), process.env.PATH].filter(Boolean).join(path.delimiter) });
+  if (!fs.existsSync(defCwd) || !fs.statSync(defCwd).isDirectory()) die(`Working folder not found: ${defCwd}. Pass --cwd <your repository> or leave it out to use the current folder.`);
   const origins = new Set([`http://127.0.0.1:${port}`, `http://localhost:${port}`]);
   const hosts = new Set([`127.0.0.1:${port}`, `localhost:${port}`]);
   const json = (res, code, obj) => { res.writeHead(code, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' }); res.end(JSON.stringify(obj)); };
@@ -434,13 +469,15 @@ function serve() {
     req.on('data', (d) => { b += d; if (b.length > 8 * 1024 * 1024) { reject(new Error('Body too large')); req.destroy(); } });
     req.on('end', () => resolve(b)); req.on('error', reject);
   });
-  let version = null;
-  const copilotVersion = () => version ? Promise.resolve(version) : new Promise((resolve) => {
-    const p = spawn(bin, ['--version'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
+  const versions = {};
+  const cliVersion = (kind) => kind in versions ? Promise.resolve(versions[kind]) : new Promise((resolve) => {
+    const p = spawn(AGENT_CLIS[kind].bin(), ['--version'], { env: agentEnv(kind), stdio: ['ignore', 'pipe', 'ignore'] });
     let out = ''; p.stdout.on('data', (d) => { out += d; });
-    p.on('error', () => resolve(null));
-    p.on('close', (code) => { version = code === 0 ? out.split('\n')[0].trim() : null; resolve(version); });
+    const done = (v) => { versions[kind] = v; resolve(v); };
+    p.on('error', () => done(null));
+    p.on('close', (code) => done(code === 0 ? out.split('\n')[0].trim() : null));
   });
+  const allVersions = async () => Object.fromEntries(await Promise.all(Object.keys(AGENT_CLIS).map(async (k) => [k, await cliVersion(k)])));
 
   const server = http.createServer(async (req, res) => {
     // Only this origin may use the bridge: blocks DNS rebinding and other websites calling localhost
@@ -448,42 +485,35 @@ function serve() {
     const url = new URL(req.url, `http://${req.headers.host}`);
     if (url.pathname.startsWith('/api/')) {
       if (req.headers.origin && !origins.has(req.headers.origin)) return json(res, 403, { error: 'Forbidden origin' });
-      if (url.pathname === '/api/bridge' && req.method === 'GET') return json(res, 200, { ok: true, copilot: await copilotVersion(), cwd: defCwd });
-      if (url.pathname === '/api/copilot' && req.method === 'POST') {
+      if (url.pathname === '/api/bridge' && req.method === 'GET') {
+        const clis = await allVersions();
+        return json(res, 200, { ok: true, cwd: defCwd, clis, copilot: clis.copilot, usesApiKeys: !!flags['use-api-keys'] });
+      }
+      if ((url.pathname === '/api/agent' || url.pathname === '/api/copilot') && req.method === 'POST') {
         if (!String(req.headers['content-type'] || '').startsWith('application/json')) return json(res, 415, { error: 'JSON required' });
         let body;
         try { body = JSON.parse(await readBody(req)); } catch (e) { return json(res, 400, { error: 'Invalid JSON' }); }
+        const kind = url.pathname === '/api/copilot' ? 'copilot' : String(body.cli || '');
+        if (!AGENT_CLIS[kind]) return json(res, 400, { error: 'Unknown CLI: ' + kind });
         const cwd = path.resolve(defCwd, String(body.cwd || '.'));
         if (!fs.existsSync(cwd) || !fs.statSync(cwd).isDirectory()) return json(res, 400, { error: 'Working folder not found: ' + cwd });
-        let prompt = String(body.prompt || '');
-        if (!prompt.trim()) return json(res, 400, { error: 'Empty prompt' });
-        const args = ['-s', '--no-ask-user'];
-        let tmp = null;
-        if (Buffer.byteLength(prompt) > 100000) {
-          tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'aic-'));
-          const pf = path.join(tmp, 'prompt.md');
-          fs.writeFileSync(pf, prompt);
-          prompt = `Read the file ${pf} completely and follow its instructions exactly. It is the full prompt for this step.`;
-          args.push('--add-dir', tmp);
-        }
-        args.unshift('-p', prompt);
-        if (body.allowAllTools) args.push('--allow-all-tools');
-        if (body.model) args.push('--model', String(body.model));
+        if (!String(body.prompt || '').trim()) return json(res, 400, { error: 'Empty prompt' });
+        const inv = agentInvocation(kind, { system: body.system ? String(body.system) : '', prompt: String(body.prompt), model: body.model ? String(body.model) : '', allowAll: !!body.allowAllTools });
         const t0 = Date.now();
-        console.log(c.m('◆') + ' ' + c.b(String(body.title || 'step')) + c.dim(` · copilot in ${cwd}${body.allowAllTools ? ' · all tools allowed' : ''}`));
-        const p = spawn(bin, args, { cwd, env, stdio: ['ignore', 'pipe', 'pipe'] });
+        console.log(c.m('◆') + ' ' + c.b(String(body.title || 'step')) + c.dim(` · ${AGENT_CLIS[kind].label} in ${cwd}${body.allowAllTools ? ' · all tools allowed' : ''}`));
+        const p = spawn(inv.bin, inv.args, { cwd, env: inv.env, stdio: [inv.input !== undefined ? 'pipe' : 'ignore', 'pipe', 'pipe'] });
+        if (inv.input !== undefined) p.stdin.end(inv.input);
         let out = ''; let err = ''; let done = false;
         p.stdout.on('data', (d) => { out += d; if (flags.verbose) process.stdout.write(c.dim(String(d))); });
         p.stderr.on('data', (d) => { err += d; });
         res.on('close', () => { if (!done) { p.kill('SIGTERM'); console.log(c.y('  ⏹ cancelled by the app')); } });
-        p.on('error', (e) => { done = true; json(res, 500, { error: e.code === 'ENOENT' ? `«${bin}» not found in PATH` : e.message }); });
+        p.on('error', (e) => { done = true; inv.cleanup(); json(res, 500, { error: e.code === 'ENOENT' ? `«${inv.bin}» not found. Install it: ${AGENT_CLIS[kind].install}` : e.message }); });
         p.on('close', (code) => {
           if (done) return;
-          done = true;
-          if (tmp) fs.rmSync(tmp, { recursive: true, force: true });
+          done = true; inv.cleanup();
           const secs = ((Date.now() - t0) / 1000).toFixed(1);
-          if (code === 0) { console.log(c.g('  ✔') + c.dim(` ${secs}s`)); json(res, 200, { output: out.trim(), warnings: err.trim() || undefined }); }
-          else { console.log(c.r(`  ✖ exit ${code}`)); json(res, 502, { error: `copilot exited with code ${code}: ${(err || out).slice(-800)}` }); }
+          if (code === 0 && out.trim()) { console.log(c.g('  ✔') + c.dim(` ${secs}s`)); json(res, 200, { output: out.trim() }); }
+          else { console.log(c.r(`  ✖ exit ${code}`)); json(res, 502, { error: `${AGENT_CLIS[kind].label} ${code === 0 ? 'returned an empty answer' : 'exited with code ' + code}: ${(err || out).slice(-800)}` }); }
         });
         return;
       }
@@ -501,10 +531,10 @@ function serve() {
     });
   });
   server.listen(port, '127.0.0.1', async () => {
-    const v = await copilotVersion();
-    console.log(`\n${c.b('AI Center')} → ${c.cy(`http://localhost:${port}`)}`);
-    console.log(c.dim(`  Copilot CLI bridge: ${v || c.r('copilot not found (npm install -g @github/copilot)')} · working folder ${defCwd}`));
-    console.log(c.dim('  Runner → engine «Copilot CLI». Ctrl+C to stop.\n'));
+    const v = await allVersions();
+    console.log(`\n${c.b('AI Center')} → ${c.cy(`http://localhost:${port}`)}  ${c.dim('· working folder ' + defCwd)}`);
+    Object.keys(AGENT_CLIS).forEach((k) => console.log(c.dim(`  ${AGENT_CLIS[k].label.padEnd(19)} `) + (v[k] ? c.g(v[k]) : c.dim('not found · ' + AGENT_CLIS[k].install))));
+    console.log(c.dim(`  ${flags['use-api-keys'] ? 'API keys in the environment are passed through (may be billed)' : 'Subscription login only: API keys in the environment are not passed to the CLIs'} · Ctrl+C to stop.\n`));
   });
 }
 main().catch((e) => { console.error(c.r('✖ ' + (e.stack || e.message))); process.exit(1); });

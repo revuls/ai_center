@@ -5,7 +5,7 @@
 - 📁 **100% files** (`.md` with frontmatter and `.json`): versionable in Git, reviewable in PRs. No database.
 - 🖱 **No installation**: open `index.html` with a double click. No server, no dependencies.
 - 🔀 **Visual workflows**: drag agents, prompts, skills, knowledge, MCP, human reviews and decisions onto a canvas.
-- ▶ **E2E execution**: in the app (manual for Copilot M365, APIs or simulation), from the CLI (Copilot CLI, Claude Code, Anthropic, GitHub Models, Azure OpenAI, Ollama) or by an agent (Copilot in agent mode, Copilot coding agent).
+- ▶ **E2E execution**: in the app (manual for Copilot M365, APIs or simulation), from the CLI (Copilot CLI, Claude Code, Codex, Anthropic, OpenAI, Azure OpenAI, Ollama) or by an agent (Copilot in agent mode, Copilot coding agent).
 - 📦 **Native export**: `.github/agents`, `prompts`, `skills`, `instructions`, `copilot-instructions.md`, `.vscode/mcp.json`, `AGENTS.md`, M365 declarative agents (manifest + `declarativeAgent.json` + icons), `.claude/`, `.cursor/`.
 - 🩺 **Governance**: quality validation, statuses (draft → stable → deprecated), versioning, secret detection and CI.
 
@@ -119,11 +119,23 @@ Full specification: [docs/FORMAT.md](docs/FORMAT.md).
 
 **Steps that must produce files**: list them in the step's **📄 Output files** field (e.g. `docs/design/{{feature}}.md`). The AI returns each file in a `file=<path>` block; the app lets you download them or write them into your repository, the CLI saves them in `runs/<run>/files/` (add `--write-files <dir>` to write them into a folder), and agents with tools create them directly in the repo. Details in [docs/FORMAT.md](docs/FORMAT.md#output-files).
 
-CLI providers: `manual` · `copilot` (Copilot CLI, runs tools in your repo) · `claude-code` · `anthropic` · `github` (GitHub Models) · `openai` · `azure` · `ollama`.
+CLI providers: `manual` · `copilot` (Copilot CLI) · `claude-code` (Claude Code) · `codex` (Codex CLI) · `anthropic` · `openai` · `azure` · `ollama`. The first three run tools in your repo and use your subscription login (see below). GitHub Models was retired by GitHub on 2026-07-30, so the old `github` provider is gone.
 
 ## Using it with GitHub Copilot CLI
 
-**In the app**: start it with `node cli/aic.mjs serve [--cwd <repo>]` and open `http://localhost:4317`. The **🐙 GitHub Copilot CLI** engine then runs workflows (Runner) and generates workflows, prompts, agents, skills… (**Generate with AI**) with your logged-in `copilot`. Use `--copilot-bin <path>` if `copilot` is not the one in your PATH.
+**In the app**: start it with `node cli/aic.mjs serve [--cwd <repo>]` and open `http://localhost:4317`. The agent CLI engines then run workflows (Runner) and generate workflows, prompts, agents, skills… (**Generate with AI**) with your own login. Use `--copilot-bin`, `--claude-bin` or `--codex-bin <path>` if the one in your PATH is not the right one.
+
+### Use your subscription instead of paying per token
+
+| Engine | Install and sign in | Plans that include it |
+|---|---|---|
+| 🐙 **Copilot CLI** (`copilot`) | `npm install -g @github/copilot`, then `copilot` → `/login` | Your GitHub Copilot plan |
+| ✳️ **Claude Code** (`claude-code`) | `npm install -g @anthropic-ai/claude-code`, then `claude` → `/login` | Claude Pro, Max or Ultra |
+| ⬛ **Codex CLI** (`codex`) | `npm install -g @openai/codex`, then `codex login` → *Sign in with ChatGPT* | ChatGPT Free (light use), Go, Plus, Pro, Business, Edu, Enterprise |
+
+Usage counts against your plan's limits, not an API bill. To make sure of that, `serve` and `run` **do not pass** `ANTHROPIC_API_KEY`, `ANTHROPIC_AUTH_TOKEN`, `OPENAI_API_KEY` or `CODEX_API_KEY` to these CLIs (otherwise they would bill the API); add `--use-api-keys` if you want them to. Use it for yourself only: the providers do not allow offering your subscription login to other people, so do not expose `serve` to your team. Without tool permissions, Claude Code runs with `--permission-mode dontAsk` and Codex in a `read-only` sandbox; with them, `acceptEdits` + Bash and `workspace-write`.
+
+**In your repositories**:
 
 **In your repositories**:
 
@@ -156,8 +168,8 @@ node cli/aic.mjs bundle                                 # regenerate library/lib
 node cli/aic.mjs export copilot m365 --out ../my-repo   # generate native files
 node cli/aic.mjs runbook feature-e2e --flavor copilot   # E2E runbook of a workflow
 node cli/aic.mjs run bugfix --input symptoms="…" --provider copilot --cwd ../my-repo
-node cli/aic.mjs run meeting-to-actions --input meeting="…" --provider github --write-files ../my-repo
-node cli/aic.mjs run bugfix --input symptoms="…" --input suspects="src/auth/" --input spec=@docs/spec.md --cwd ../my-repo --provider github
+node cli/aic.mjs run meeting-to-actions --input meeting="…" --provider codex --write-files ../my-repo
+node cli/aic.mjs run bugfix --input symptoms="…" --input suspects="src/auth/" --input spec=@docs/spec.md --cwd ../my-repo --provider claude-code
 node cli/aic.mjs agents-md                              # regenerate this repo's AGENTS.md
 ```
 

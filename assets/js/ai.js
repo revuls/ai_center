@@ -8,16 +8,15 @@
   const V = (AIC.views = AIC.views || {});
 
   const ENGINES = [
-    { value: 'copilot-cli', label: '🐙 GitHub Copilot CLI (node cli/aic.mjs serve)' },
+    { value: 'copilot-cli', label: '🐙 GitHub Copilot CLI (your Copilot plan)' },
+    { value: 'claude-cli', label: '✳️ Claude Code (your Claude Pro/Max/Ultra plan)' },
+    { value: 'codex-cli', label: '⬛ Codex CLI (your ChatGPT plan)' },
     { value: 'anthropic', label: '🟣 Anthropic API' },
-    { value: 'openai', label: '🟢 OpenAI-compatible (OpenAI, GitHub Models, Ollama…)' },
+    { value: 'openai', label: '🟢 OpenAI-compatible (OpenAI API, Ollama…)' },
     { value: 'azure', label: '🔷 Azure OpenAI' },
     { value: 'manual', label: '✋ Manual: copy the prompt, paste the answer' }
   ];
 
-  async function bridgeInfo() {
-    try { const r = await fetch('/api/bridge', { cache: 'no-store' }); return r.ok ? await r.json() : null; } catch (e) { return null; }
-  }
 
   /** Engine settings shared with the Runner (S.prefs.llm). */
   function engineConfig() {
@@ -37,16 +36,8 @@
     function draw() {
       fields.innerHTML = '';
       const p = cfg.provider;
-      if (p === 'copilot-cli') {
-        const st = h('div', { class: 'callout small' }, h('span', { class: 'spinner' }), h('div', null, 'Checking the Copilot CLI bridge…'));
-        fields.append(st, inp('Model (optional)', 'model', { placeholder: 'Default model of your Copilot CLI' }));
-        bridgeInfo().then((b) => {
-          st.innerHTML = '';
-          if (b && b.copilot) { st.className = 'callout ok small'; st.append('✅', h('div', null, h('b', null, b.copilot))); }
-          else { st.className = 'callout err small'; st.append('⛔', h('div', null, b ? 'The bridge is running but copilot was not found.' : 'Open the app with ', b ? null : h('code', null, 'node cli/aic.mjs serve'), b ? null : ' to use Copilot CLI, or pick another engine.')); }
-        });
-      }
-      if (p === 'openai') fields.append(inp('Base URL', 'baseUrl', { placeholder: 'https://api.openai.com/v1 · https://models.github.ai/inference · http://localhost:11434/v1' }));
+      if (V.AGENT_ENGINES[p]) fields.append(V.bridgeStatus(p), inp('Model (optional)', 'model', { placeholder: V.AGENT_ENGINES[p].modelHint }));
+      if (p === 'openai') fields.append(inp('Base URL', 'baseUrl', { placeholder: 'https://api.openai.com/v1 · http://localhost:11434/v1 (Ollama)' }));
       if (p === 'azure') fields.append(inp('Endpoint', 'baseUrl', { placeholder: 'https://my-resource.openai.azure.com' }));
       if (p === 'anthropic' || p === 'openai' || p === 'azure') {
         fields.append(inp(p === 'azure' ? 'Deployment' : 'Model', 'model', { placeholder: p === 'anthropic' ? 'claude-sonnet-5-5' : p === 'azure' ? 'gpt-4o' : 'gpt-4.1' }));
@@ -55,7 +46,7 @@
       }
     }
     draw();
-    box.append(h('div', { class: 'field', style: { margin: 0 } }, h('div', { class: 'lbl' }, 'AI engine'), sel, h('div', { class: 'help' }, 'Shared with the Runner.')), fields);
+    box.append(h('div', { class: 'field', style: { margin: 0 } }, h('div', { class: 'lbl' }, 'AI engine'), sel, h('div', { class: 'help' }, 'Shared with the Runner. The three CLIs use your own subscription (no API billing) through node cli/aic.mjs serve.')), fields);
     return box;
   }
 
@@ -230,5 +221,5 @@
     });
   }
 
-  AIC.ai = { ENGINES, bridgeInfo, engineConfig, enginePanel, callEngine, aiDialog, generateItem, itemPrompt, itemPatch };
+  AIC.ai = { ENGINES, engineConfig, enginePanel, callEngine, aiDialog, generateItem, itemPrompt, itemPatch };
 })();

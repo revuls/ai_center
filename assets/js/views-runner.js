@@ -10,24 +10,48 @@
 
   const PROVIDERS = [
     { value: 'manual', label: '✋ Manual (copy and paste)', desc: 'Works with Copilot M365, Copilot Chat, ChatGPT, Claude… You copy each step\'s prompt, paste the answer and the flow continues.' },
-    { value: 'copilot-cli', label: '🐙 GitHub Copilot CLI', desc: 'Runs each step with your logged-in Copilot CLI on this machine (agents, skills, tools). Needs the app served by node cli/aic.mjs serve.' },
+    { value: 'copilot-cli', label: '🐙 GitHub Copilot CLI', desc: 'Your Copilot plan, no API billing. Runs each step with your logged-in Copilot CLI on this machine. Needs node cli/aic.mjs serve.' },
+    { value: 'claude-cli', label: '✳️ Claude Code', desc: 'Your Claude Pro/Max/Ultra plan, no API billing. Runs each step with your logged-in Claude Code. Needs node cli/aic.mjs serve.' },
+    { value: 'codex-cli', label: '⬛ Codex CLI (ChatGPT)', desc: 'Your ChatGPT plan, no API billing. Runs each step with Codex signed in with ChatGPT. Needs node cli/aic.mjs serve.' },
     { value: 'simulate', label: '🧪 Simulation', desc: 'Walks the flow with sample outputs to validate the design without spending tokens.' },
     { value: 'anthropic', label: '🟣 Anthropic API', desc: 'Calls Claude directly from the browser with your key.' },
-    { value: 'openai', label: '🟢 OpenAI-compatible', desc: 'OpenAI, GitHub Models, Ollama, LM Studio, vLLM… (base URL + key).' },
+    { value: 'openai', label: '🟢 OpenAI-compatible', desc: 'OpenAI API, Ollama, LM Studio, vLLM… (base URL + key; local models are free).' },
     { value: 'azure', label: '🔷 Azure OpenAI', desc: 'Endpoint + deployment of your Azure OpenAI resource.' }
   ];
 
   const AGENTIC_NOTE = '\n\n---\nYou are working inside the current repository and can use your tools (read/edit files, run commands). When you finish this step, answer with the complete step deliverable in Markdown.';
+  /** Agent CLIs run through the local bridge (node cli/aic.mjs serve) with the user's own subscription login. */
+  const AGENT_ENGINES = {
+    'copilot-cli': { cli: 'copilot', name: 'Copilot CLI', install: 'npm install -g @github/copilot', login: 'copilot, then /login', modelHint: 'Default model of your Copilot plan' },
+    'claude-cli': { cli: 'claude', name: 'Claude Code', install: 'npm install -g @anthropic-ai/claude-code', login: 'claude, then /login with your Pro, Max or Ultra plan', modelHint: 'sonnet · opus · haiku (default: your plan\'s)' },
+    'codex-cli': { cli: 'codex', name: 'Codex CLI', install: 'npm install -g @openai/codex', login: 'codex login, then «Sign in with ChatGPT»', modelHint: 'Default model of your ChatGPT plan' }
+  };
+  V.AGENT_ENGINES = AGENT_ENGINES;
   async function bridgeInfo() {
     try { const r = await fetch('/api/bridge', { cache: 'no-store' }); return r.ok ? await r.json() : null; } catch (e) { return null; }
   }
+  /** Status callout for an agent engine (is the bridge up, is the CLI installed). */
+  function bridgeStatus(provider) {
+    const E = AGENT_ENGINES[provider];
+    const st = h('div', { class: 'callout small' }, h('span', { class: 'spinner' }), h('div', null, 'Checking ', E.name, '…'));
+    bridgeInfo().then((b) => {
+      st.innerHTML = '';
+      const v = b && (b.clis ? b.clis[E.cli] : E.cli === 'copilot' ? b.copilot : null);
+      if (v) { st.className = 'callout ok small'; st.append('✅', h('div', null, h('b', null, v), ' · working folder ', h('code', null, b.cwd), b.usesApiKeys ? ' · ⚠ API keys passed through (may be billed)' : ' · subscription login')); }
+      else if (b) { st.className = 'callout err small'; st.append('⛔', h('div', null, E.name, ' was not found. Install it with ', h('code', null, E.install), ', sign in (', h('code', null, E.login), ') and restart ', h('code', null, 'serve'), '.')); }
+      else { st.className = 'callout err small'; st.append('⛔', h('div', null, 'Bridge not available. Open the app with ', h('code', null, 'node cli/aic.mjs serve --cwd <your repo>'), ' and use the URL it prints.')); }
+    });
+    return st;
+  }
+  V.bridgeStatus = bridgeStatus;
   async function callLLM(cfg, composed, signal) {
     const p = cfg.provider;
-    if (p === 'copilot-cli') {
-      const r = await fetch('/api/copilot', {
+    if (AGENT_ENGINES[p]) {
+      const E = AGENT_ENGINES[p];
+      const r = await fetch('/api/agent', {
         method: 'POST', signal, headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ title: composed.title, prompt: composed.full + (cfg.allowAllTools ? AGENTIC_NOTE : ''), cwd: cfg.cwd || undefined, model: cfg.model || undefined, allowAllTools: !!cfg.allowAllTools })
-      }).catch((e) => { if (e.name === 'AbortError') throw e; throw new Error('Copilot CLI bridge not reachable: start the app with `node cli/aic.mjs serve`'); });
+        body: JSON.stringify({ cli: E.cli, title: composed.title, system: composed.system, prompt: composed.user + (cfg.allowAllTools ? AGENTIC_NOTE : ''), cwd: cfg.cwd || undefined, model: cfg.model || undefined, allowAllTools: !!cfg.allowAllTools })
+      }).catch((e) => { if (e.name === 'AbortError') throw e; throw new Error(E.name + ' bridge not reachable: start the app with `node cli/aic.mjs serve`'); });
       const d = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(d.error || 'HTTP ' + r.status);
       return d.output;
@@ -148,7 +172,7 @@
         const p = cfg.provider;
         if (p === 'anthropic' || p === 'openai' || p === 'azure') {
           if (p !== 'anthropic') cfgBox.append(h('div', { class: 'field' }, h('div', { class: 'lbl' }, p === 'azure' ? 'Endpoint' : 'Base URL'),
-            h('input', { type: 'url', value: cfg.baseUrl, placeholder: p === 'azure' ? 'https://mi-recurso.openai.azure.com' : 'https://api.openai.com/v1 · https://models.github.ai/inference · http://localhost:11434/v1', oninput: (e) => { cfg.baseUrl = e.target.value; } })));
+            h('input', { type: 'url', value: cfg.baseUrl, placeholder: p === 'azure' ? 'https://mi-recurso.openai.azure.com' : 'https://api.openai.com/v1 · http://localhost:11434/v1 (Ollama)', oninput: (e) => { cfg.baseUrl = e.target.value; } })));
           cfgBox.append(h('div', { class: 'field' }, h('div', { class: 'lbl' }, p === 'azure' ? 'Deployment' : 'Model'),
             h('input', { type: 'text', value: cfg.model, placeholder: p === 'anthropic' ? 'claude-sonnet-5-5' : p === 'azure' ? 'gpt-4o' : 'gpt-4.1 · openai/gpt-4.1 · llama3.1', oninput: (e) => { cfg.model = e.target.value; } })));
           cfgBox.append(h('div', { class: 'field' }, h('div', { class: 'lbl' }, 'API key'),
@@ -156,21 +180,15 @@
             h('label', { class: 'check small', style: { marginTop: '6px' } }, h('input', { type: 'checkbox', checked: cfg.remember, onchange: (e) => { cfg.remember = e.target.checked; } }), 'Remember the key in this browser (never stored in files)')));
           cfgBox.append(h('div', { class: 'callout small' }, '🔐', h('div', null, 'The call goes straight from your browser to the provider. If the provider blocks CORS, use the CLI: ', h('code', null, `node cli/aic.mjs run ${wf.id}`), '.')));
         }
-        if (p === 'copilot-cli') {
-          const st = h('div', { class: 'callout small' }, h('span', { class: 'spinner' }), h('div', null, 'Checking the Copilot CLI bridge…'));
-          cfgBox.append(st);
-          bridgeInfo().then((b) => {
-            st.innerHTML = '';
-            if (b && b.copilot) { st.className = 'callout ok small'; st.append('✅', h('div', null, h('b', null, b.copilot), ' · working folder ', h('code', null, b.cwd))); }
-            else if (b) { st.className = 'callout err small'; st.append('⛔', h('div', null, 'The bridge is running but ', h('code', null, 'copilot'), ' was not found. Install it: ', h('code', null, 'npm install -g @github/copilot'), ' and log in with ', h('code', null, '/login'), '.')); }
-            else { st.className = 'callout err small'; st.append('⛔', h('div', null, 'Bridge not available. Open the app with ', h('code', null, 'node cli/aic.mjs serve --cwd <your repo>'), ' and use the URL it prints.')); }
-          });
+        if (AGENT_ENGINES[p]) {
+          const E = AGENT_ENGINES[p];
+          cfgBox.append(bridgeStatus(p));
           cfgBox.append(h('div', { class: 'field', style: { marginTop: '10px' } }, h('div', { class: 'lbl' }, 'Working folder'),
             h('input', { type: 'text', value: cfg.cwd, placeholder: 'Default: the --cwd of serve (relative paths resolve from it)', oninput: (e) => { cfg.cwd = e.target.value; } })));
           cfgBox.append(h('div', { class: 'field' }, h('div', { class: 'lbl' }, 'Model (optional)'),
-            h('input', { type: 'text', value: cfg.model, placeholder: 'Default model of your Copilot CLI · auto', oninput: (e) => { cfg.model = e.target.value; } })));
+            h('input', { type: 'text', value: cfg.model, placeholder: E.modelHint, oninput: (e) => { cfg.model = e.target.value; } })));
           cfgBox.append(h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: cfg.allowAllTools, onchange: (e) => { cfg.allowAllTools = e.target.checked; } }),
-            'Let Copilot use all tools (edit files, run commands) in the working folder'));
+            `Let ${E.name} edit files and run commands in the working folder`));
         }
         if (p !== 'manual') cfgBox.append(h('label', { class: 'check', style: { marginTop: '10px' } }, h('input', { type: 'checkbox', checked: autoApprove, onchange: (e) => { autoApprove = e.target.checked; } }), 'Approve human reviews automatically'));
       };
@@ -268,7 +286,7 @@
             setTimeout(() => out.focus(), 30);
             return waitUser();
           }
-          const panel = h('div', { class: 'card card-pad' }, h('div', { class: 'row' }, h('span', { class: 'spinner' }), h('b', null, composed.title), h('span', { class: 'muted small' }, cfg.provider === 'copilot-cli' ? ' · Copilot CLI working…' : ' · calling ' + cfg.provider + '…')), h('div', { style: { marginTop: '10px' } }, promptBox(composed)));
+          const panel = h('div', { class: 'card card-pad' }, h('div', { class: 'row' }, h('span', { class: 'spinner' }), h('b', null, composed.title), h('span', { class: 'muted small' }, AGENT_ENGINES[cfg.provider] ? ' · ' + AGENT_ENGINES[cfg.provider].name + ' working…' : ' · calling ' + cfg.provider + '…')), h('div', { style: { marginTop: '10px' } }, promptBox(composed)));
           setPanel(panel);
           return callLLM(cfg, composed, ctrl.signal);
         },

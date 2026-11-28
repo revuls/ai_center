@@ -700,8 +700,8 @@
       const ins = wf.inputs.map((i) => `--input ${i.name}="…"`).join(' ');
       const cmds = [
         ['Copilot CLI (runs tools in your repo)', `node cli/aic.mjs run ${wf.id} ${ins} --provider copilot`],
-        ['Claude Code', `node cli/aic.mjs run ${wf.id} ${ins} --provider claude-code`],
-        ['GitHub Models (GITHUB_TOKEN)', `node cli/aic.mjs run ${wf.id} ${ins} --provider github --model openai/gpt-4.1`],
+        ['Claude Code (your Claude plan)', `node cli/aic.mjs run ${wf.id} ${ins} --provider claude-code`],
+        ['Codex CLI (your ChatGPT plan)', `node cli/aic.mjs run ${wf.id} ${ins} --provider codex`],
         ['Anthropic API (ANTHROPIC_API_KEY)', `node cli/aic.mjs run ${wf.id} ${ins} --provider anthropic`],
         ['Manual (asks you to paste each answer)', `node cli/aic.mjs run ${wf.id} ${ins} --provider manual`]
       ];
