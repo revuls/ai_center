@@ -12,7 +12,7 @@ AI Center is the **team framework for working with AI**. It stores in files ever
 ## Principles
 
 - **Everything is a file** (\`.md\` with frontmatter and \`.json\`): versioned in Git, reviewed in PRs and shared like code. No database.
-- **No installation**: open \`index.html\` with a double click. No server, no dependencies.
+- **No installation**: open \`index.html\` with a double click. No dependencies. To let the app use your AI subscription (Copilot, Claude, ChatGPT), start the small local server \`node cli/aic.mjs serve\`.
 - **One source, many AIs**: define it once and export it to Copilot (VS Code, coding agent, CLI), M365, Claude Code, Cursor…
 - **Runnable end to end**: workflows run from the app, from the CLI or by an agent (Copilot in agent mode, Copilot coding agent, Claude Code).
 
@@ -22,7 +22,8 @@ AI Center is the **team framework for working with AI**. It stores in files ever
 2. Click **Connect folder** (sidebar) and pick the framework folder (the one containing \`library/\`).
 3. Browse the library, star your favorites ★ and try a prompt with **Use**.
 4. Open a workflow, review it on the canvas and click **Run** (*Simulation* mode to try it without an AI).
-5. Go to **Export to AIs** and generate the files for your repository.
+5. To work with a real AI using your own plan, set up an engine (see **AI engines**) and open the app from \`node cli/aic.mjs serve\` at \`http://localhost:4317\`.
+6. Go to **Export to AIs** and generate the files for your repository.
 
 ## How to share it with the team
 
@@ -45,8 +46,10 @@ AI Center is the **team framework for working with AI**. It stores in files ever
 | 🧩 **Skill** | Packaged procedure (*Agent Skills* standard, \`SKILL.md\` + resources) | There is a "how it's done" several agents must apply | \`.github/skills/\`, \`.claude/skills/\`, inline in M365 |
 | 📏 **Instruction** | Always-on rule (global) or per files (\`applyTo\`) | Code conventions, language, style, security | \`copilot-instructions.md\`, \`*.instructions.md\`, \`CLAUDE.md\`, \`.mdc\` |
 | 📚 **Knowledge** | Business/technical context | Glossary, architecture, DoD, processes | \`docs/ai/knowledge/\`, inline in M365 agents |
-| 🔌 **MCP** | Tool server (Model Context Protocol) | Agents need to act: GitHub, Jira, browser, databases… | \`.vscode/mcp.json\`, \`.mcp.json\`, \`.cursor/mcp.json\` |
-| 🔀 **Workflow** | E2E flow combining all of the above + human reviews | A multi-step process you want to repeat and automate | \`/wf-*\` runbooks for Copilot and Claude, M365 guide, CLI |
+| 🔌 **MCP** | Tool server (Model Context Protocol) | Agents need to act: GitHub, Jira, browser, databases… | \`.vscode/mcp.json\`, \`.github/mcp.json\` (Copilot CLI), \`.mcp.json\`, \`.cursor/mcp.json\` |
+| 🔀 **Workflow** | E2E flow combining all of the above + human reviews | A multi-step process you want to repeat and automate | \`/wf-*\` runbooks for Copilot and Claude, \`/run-*\` skills for Copilot CLI, M365 guide, CLI |
+
+> **Create them with AI**: every editor has **Generate with AI** (or **Improve with AI** on an existing item). Describe what you need, pick an engine, review the result and save.
 
 ## Golden rules
 
@@ -115,10 +118,51 @@ Unsafe paths (absolute or with \`..\`) are always ignored, and declared files th
 | **App · API** | Anthropic, OpenAI-compatible (OpenAI, Ollama…), Azure OpenAI | Automatic execution with on-screen human reviews |
 | **App · Simulation** | Sample outputs | Validating the design |
 | **Copilot (agent mode)** | Export and type \`/wf-<id>\` in the chat | IDE development with real tools |
-| **Copilot coding agent / CLI** | "Run the workflow in \`.github/prompts/wf-<id>.prompt.md\`" | Autonomous work on issues |
-| **CLI** | \`node cli/aic.mjs run <id> --provider copilot\\|claude-code\\|anthropic\\|github…\` | Automation, CI, agentic execution in the repo |
+| **Copilot CLI** | Export and type \`/run-<id> <your input>\` in \`copilot\` | Terminal work in the repo |
+| **Copilot coding agent** | "Run the workflow in \`.github/prompts/wf-<id>.prompt.md\`" | Autonomous work on issues |
+| **CLI** | \`node cli/aic.mjs run <id> --provider <engine>\` with \`copilot\`, \`claude-code\`, \`codex\`, \`ollama\`… | Automation, CI, agentic execution in the repo |
 
-Every run produces a **report** (\`REPORT.md\`) and \`run.json\` in \`runs/\`.
+- **Runs keep going in the background**: you can leave the run screen and browse; **Runs → Current session runs** shows each one (running, waiting for you, finished) and takes you back to it. Reloading or closing the tab stops them.
+- Every run produces a **report** (\`REPORT.md\`) and \`run.json\` in \`runs/\` (with a connected folder or the CLI) and in the browser history.
+`
+    },
+    {
+      id: 'engines', icon: '⚡', title: 'AI engines (your subscription)',
+      md: `# AI engines: use your own subscription
+
+The app can run workflows, run prompts and **Generate with AI** using the plan you already pay for. There is no per-token API bill: usage counts against your plan's limits.
+
+| Engine | You need | Install | Sign in |
+|---|---|---|---|
+| 🐙 **GitHub Copilot** | Any Copilot plan | \`npm install -g @github/copilot\` | \`copilot\` → \`/login\` |
+| ✳️ **Claude Code** | Claude Pro, Max or Ultra | \`npm install -g @anthropic-ai/claude-code\` | \`claude\` → sign in with your Claude account |
+| ⬛ **Codex CLI** | ChatGPT Free (light use), Go, Plus, Pro, Business, Edu or Enterprise | \`npm install -g @openai/codex\` | \`codex login\` → *Sign in with ChatGPT* |
+| 🟢 **Ollama** | 8 GB of RAM or more (free, local) | [ollama.com/download](https://ollama.com/download), then \`ollama pull llama3.2\` | No account |
+
+All of them need **Node.js 18+**. The step-by-step guide for the team, with checks and troubleshooting, is in \`docs/ENGINES.md\`.
+
+## Start the app with the engines
+
+\`\`\`bash
+node cli/aic.mjs serve --cwd /path/to/your/repository
+\`\`\`
+
+Open \`http://localhost:4317\` (not the \`index.html\` file). The server lists which engines it found; restart it after installing one. \`--cwd\` is the folder the AI works in.
+
+## Where to choose the engine
+
+Every place that uses AI has an **AI engine** selector, shared across the app; a green check means it is ready.
+
+- **Runner** (workflows), **Generate with AI** / **Improve with AI** in the editors, **Design with AI** for workflows, and **Use → Run** in prompts.
+- **Ollama**: choose *OpenAI-compatible* with base URL \`http://localhost:11434/v1\`, model \`llama3.2\` and no API key.
+- Other APIs (Anthropic, OpenAI, Azure OpenAI) use your own API key, billed per token.
+
+## Good to know
+
+- **File changes are off by default.** Tick *Let … edit files and run commands* only when the AI should change the working folder, and review the diff with Git.
+- **No surprise bills**: the server does not pass \`ANTHROPIC_API_KEY\`, \`OPENAI_API_KEY\` or \`CODEX_API_KEY\` to the CLIs, so they use your subscription. Use \`--use-api-keys\` to change that.
+- **Personal use only**: keep the server on your own computer; never expose it to the network or share your login.
+- If a CLI is installed in several places, pick one with \`--copilot-bin\`, \`--claude-bin\` or \`--codex-bin <path>\`.
 `
     },
     {
@@ -132,10 +176,12 @@ Export with the **GitHub Copilot** target and copy the result to the root of the
   copilot-instructions.md        ← global instructions + resource catalog
   instructions/*.instructions.md ← rules per file type (applyTo)
   prompts/*.prompt.md            ← prompts → /name in the chat
-  prompts/wf-*.prompt.md         ← E2E workflows → /wf-name (agent mode)
+  prompts/wf-*.prompt.md         ← E2E workflows → /wf-name (VS Code agent mode)
   agents/*.agent.md              ← custom agents (with tools, model and handoffs)
   skills/<id>/SKILL.md           ← agent skills
-.vscode/mcp.json                 ← MCP servers (secrets via \${input:…})
+  skills/run-<id>/SKILL.md       ← E2E workflows → /run-name (Copilot CLI)
+  mcp.json                       ← MCP servers for Copilot CLI
+.vscode/mcp.json                 ← MCP servers for VS Code (secrets via \${input:…})
 docs/ai/knowledge/*.md           ← knowledge referenced by the agents
 AGENTS.md                        ← guide for coding agent, CLI and other agents
 \`\`\`
@@ -146,7 +192,13 @@ AGENTS.md                        ← guide for coding agent, CLI and other agent
 - An agent's **handoffs** create buttons to pass the work to the next agent (e.g. *Architect → Developer → Reviewer*).
 - MCP tools assigned to an agent are added as \`server/*\` to its \`tools\`.
 - **Copilot coding agent**: create an issue and assign it with the text «Run the workflow \`/wf-feature-e2e\` with idea: …». It reads \`AGENTS.md\`.
-- **Copilot CLI**: \`node cli/aic.mjs run <workflow> --provider copilot\` runs each step with \`copilot -p\` in your repo.
+
+## Copilot CLI
+
+- Open \`copilot\` in the repository: it loads the instructions, \`AGENTS.md\`, the skills and the MCP servers of \`.github/mcp.json\` (after you trust the folder).
+- Run a workflow with its skill: \`/run-bugfix Login fails after the 2FA change\`. Pick an agent with \`/agent\` or \`copilot --agent code-reviewer -p "…"\`.
+- Agents get tool aliases that Copilot CLI understands (\`read\`, \`edit\`, \`search\`, \`execute\`…). Two harmless warnings: \`handoffs\` is ignored, and a \`model\` written as a VS Code name falls back to your current model.
+- From AI Center: \`node cli/aic.mjs run <workflow> --provider copilot\` runs each step with \`copilot -p\` in your repo, or use the **GitHub Copilot CLI** engine in the app (see **AI engines**).
 `
     },
     {
@@ -195,6 +247,8 @@ Copilot M365 does not chain agents on its own: use the **Runner** in **Manual** 
 - Ask it to **ask** when essential information is missing and to **state assumptions**.
 - Prefer **lists and checklists** over prose.
 - Split large tasks into **workflow steps**, with human review at critical points.
+- **Test it where you write it**: **Use → Run** sends the filled prompt to the engine you pick and keeps the answer (also in **Runs**). Try it with two engines before marking it **Stable**.
+- **Improve with AI** rewrites a prompt from your feedback; review the result before saving.
 - Iterate: keep the version that works, mark it **Stable** and bump the **version**.
 - Measure: if a prompt is used a lot, turn it into a **skill** or an **agent**.
 
@@ -243,6 +297,8 @@ Copilot M365 does not chain agents on its own: use the **Runner** in **Manual** 
 - **Ownership**: fill in *Author* and *Tribe / Area* so other departments know who to ask (set your defaults in **Settings**), and review changes via PR (CODEOWNERS on \`library/\`).
 - **CI validation**: \`node cli/aic.mjs lint\` returns an error code if there are errors.
 - **Runner API keys**: only in your browser and only if you tick *Remember*.
+- **AI subscriptions are personal**: use Copilot, Claude Code or Codex through \`serve\` only on your own computer. The server accepts connections from that computer only; never expose it to the network.
+- **Tools off by default**: the AI only edits files or runs commands when you tick that option, and only in the working folder. Review the changes with Git.
 `
     },
     {
@@ -260,7 +316,7 @@ library/
   knowledge/<id>.md
   mcp/<id>.mcp.json
   workflows/<id>.workflow.json
-runs/<date>-<workflow>/run.json + REPORT.md
+runs/<date>-<workflow or prompt>/run.json + REPORT.md
 \`\`\`
 
 ## Markdown with frontmatter
@@ -303,16 +359,22 @@ You have not connected the folder (or your browser does not allow it). Use Chrom
 Click *Reload* in the sidebar. If you open it without a folder, regenerate the bundle with \`node cli/aic.mjs bundle\`.
 
 **Can I use it with other AIs?**
-Yes: the *Any AI* target generates plain-text system prompts and runbooks, and the runner supports any OpenAI-compatible API.
+Yes: GitHub Copilot, Claude Code and Codex with your subscription, Ollama for free local models, and any OpenAI-compatible API. The *Any AI* export target generates plain-text system prompts and runbooks for the rest.
+
+**Do I pay per token?**
+Not with Copilot CLI, Claude Code or Codex: usage counts against your plan. Ollama is free. Only the API engines (Anthropic, OpenAI, Azure) are billed per token.
+
+**The engine shows "not found" or "Bridge not available".**
+Open the app from \`node cli/aic.mjs serve\` (\`http://localhost:4317\`), not from \`index.html\`. If an engine is missing, install it and restart the server. See \`docs/ENGINES.md\` for more fixes.
 
 **How do I run a workflow unattended?**
-CLI with \`--auto-approve\` (e.g. in CI) or in the app with an API provider and *Approve automatically*.
+CLI with \`--auto-approve\` (e.g. in CI) or in the app with an automatic engine and *Approve automatically*.
 
 **Where are runs stored?**
 In \`runs/\` (with a connected folder or the CLI) and in the browser history.
 
 **Can the app be published?**
-It is static HTML: you can serve it from GitHub Pages or SharePoint for reading. To edit, each person opens it locally with the repo folder.
+It is static HTML: you can serve it from GitHub Pages or SharePoint for reading, manual runs and API engines. The subscription engines (Copilot CLI, Claude Code, Codex) need \`serve\` on each person's computer, so use them locally.
 `
     }
   ];

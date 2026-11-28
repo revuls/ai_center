@@ -333,10 +333,10 @@
     const G = AIC.GUIDE || [];
     const cur = G.find((g) => g.id === section) || G[0];
     const page = h('div', { class: 'page' });
-    page.append(h('div', { class: 'page-head' }, h('div', null, h('h1', null, '📖 Guide and best practices'), h('p', null, 'How the team works with AI using AI Center, GitHub Copilot and Copilot M365.'))));
+    page.append(h('div', { class: 'page-head' }, h('div', null, h('h1', null, '📖 Guide and best practices'), h('p', null, 'How the team works with AI using AI Center with GitHub Copilot, Claude, ChatGPT, Ollama and Copilot M365.'))));
     const nav = h('div', { class: 'card', style: { padding: '8px', position: 'sticky', top: '0' } }, ...G.map((g) => h('a', { href: '#/guide/' + g.id, class: 'menu-item' + (g === cur ? ' sel' : ''), style: { textDecoration: 'none' } }, h('span', null, g.icon), h('span', null, g.title))));
     const content = h('div', { class: 'card card-pad md', html: cur ? md(cur.md, { vars: false }) : 'No content' });
-    page.append(h('div', { class: 'grid', style: { gridTemplateColumns: '260px 1fr', alignItems: 'start' } }, nav, content));
+    page.append(h('div', { class: 'grid guide' }, nav, content));
     root.append(page);
   };
 })();
