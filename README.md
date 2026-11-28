@@ -127,6 +127,8 @@ CLI providers: `manual` · `copilot` (Copilot CLI) · `claude-code` (Claude Code
 
 ### Use your subscription instead of paying per token
 
+📘 **Step-by-step setup guide for your team** (prerequisites, install, sign-in and troubleshooting for Copilot, Claude, Codex and Ollama): [docs/ENGINES.md](docs/ENGINES.md).
+
 | Engine | Install and sign in | Plans that include it |
 |---|---|---|
 | 🐙 **Copilot CLI** (`copilot`) | `npm install -g @github/copilot`, then `copilot` → `/login` | Your GitHub Copilot plan |
