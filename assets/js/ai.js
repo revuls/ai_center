@@ -50,11 +50,11 @@
     return box;
   }
 
-  /** Calls the engine (not manual). Generation never needs tools. */
-  async function callEngine(cfg, composed, signal) {
+  /** Calls the engine (not manual). Tools are off unless opts.allowTools (agent CLIs only). */
+  async function callEngine(cfg, composed, signal, opts) {
     if ((cfg.provider === 'anthropic' || cfg.provider === 'azure') && !cfg.apiKey) throw new Error('Enter the API key');
     saveEngine(cfg);
-    return V.callLLM(Object.assign({}, cfg, { allowAllTools: false }), composed, signal);
+    return V.callLLM(Object.assign({}, cfg, { allowAllTools: !!(opts && opts.allowTools) }), composed, signal);
   }
 
   /**

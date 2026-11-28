@@ -557,7 +557,8 @@
    * ======================================================== */
   V.usePrompt = function (p) {
     const vars = C.extractVars(p.body).filter((v) => !v.name.includes('.'));
-    const values = {};
+    const last = (V._promptRuns || {})['prompt:' + (p.id || 'draft')];
+    const values = Object.assign({}, last && last.values); // keep the values of the last run
     const out = h('pre', { class: 'code-view', style: { maxHeight: '340px' } });
     let flavor = 'filled';
     const upd = () => {
@@ -571,7 +572,7 @@
       }
     };
     const fields = vars.map((v) => {
-      const ta = h('textarea', { rows: 2, placeholder: v.placeholder || '', oninput: (e) => { values[v.name] = e.target.value; upd(); } });
+      const ta = h('textarea', { rows: 2, placeholder: v.placeholder || '', value: values[v.name] || '', oninput: (e) => { values[v.name] = e.target.value; upd(); } });
       const attach = h('button', { class: 'btn ghost sm', title: 'Use the content of files or a folder as the value', onclick: () => menu(attach, [
         { icon: '📄', label: 'File(s)…', onClick: () => attachFiles(false) },
         { icon: '📁', label: 'Folder…', onClick: () => attachFiles(true) }
@@ -591,11 +592,74 @@
       seg.append(h('button', { class: 'btn sm' + (k === flavor ? ' on' : ''), onclick: (e) => { flavor = k; Array.from(seg.children).forEach((c) => c.classList.remove('on')); e.currentTarget.classList.add('on'); upd(); } }, l));
     });
     upd();
+
+    // ---- ▶ Run: send the filled prompt to an AI engine and show the answer here
+    const runs = (V._promptRuns = V._promptRuns || {}); // prompt key → last run (survives closing the dialog)
+    const key = 'prompt:' + (p.id || 'draft');
+    const cfg = AIC.ai.engineConfig();
+    if (cfg.provider === 'manual') cfg.provider = 'copilot-cli';
+    let allowTools = false;
+    const toolsBox = h('div');
+    const drawTools = () => {
+      toolsBox.innerHTML = '';
+      const E = V.AGENT_ENGINES[cfg.provider];
+      if (E) toolsBox.append(h('label', { class: 'check small' }, h('input', { type: 'checkbox', checked: allowTools, onchange: (e) => { allowTools = e.target.checked; } }),
+        `Let ${E.name} edit files and run commands in the working folder of serve`));
+    };
+    const panel = AIC.ai.enginePanel(cfg);
+    panel.addEventListener('change', (e) => { if (e.target.tagName === 'SELECT') drawTools(); });
+    drawTools();
+    const resBox = h('div');
+    const runBtn = btn('Run', () => runIt(), { cls: 'primary', icon: 'play' });
+    const drawRun = () => {
+      resBox.innerHTML = '';
+      const r = runs[key];
+      if (!r) return;
+      r.redraw = drawRun;
+      const engine = (AIC.ai.ENGINES.find((x) => x.value === r.engine) || {}).label || r.engine;
+      runBtn.disabled = r.state === 'running';
+      if (r.state === 'running') {
+        resBox.append(h('div', { class: 'callout small' }, h('span', { class: 'spinner' }), h('div', { class: 'grow' }, 'Running with ', h('b', null, engine), '… you can close this dialog: it keeps going and the answer will be here.'),
+          btn('Stop', () => r.ctrl.abort(), { cls: 'sm danger', icon: 'stop' })));
+        return;
+      }
+      if (r.state !== 'done') { resBox.append(h('div', { class: 'callout err small' }, r.state === 'cancelled' ? '⏹' : '⛔', h('div', null, r.state === 'cancelled' ? 'Run stopped.' : r.error))); return; }
+      resBox.append(h('div', { class: 'row wrap', style: { margin: '6px 0' } }, h('b', null, '✅ Answer'), h('span', { class: 'muted small' }, engine + ' · ' + timeAgo(r.finishedAt)), h('div', { class: 'grow' }),
+        btn('Copy', () => copy(r.output), { cls: 'sm', icon: 'copy' }),
+        btn('.md', () => AIC.download((p.id || 'prompt') + '-answer.md', r.output), { cls: 'sm', icon: 'download', title: 'Download the answer' })),
+      h('div', { class: 'md card card-pad', style: { maxHeight: '420px', overflow: 'auto' }, html: md(r.output) }));
+    };
+    async function runIt() {
+      const missing = vars.filter((v) => !String(values[v.name] || '').trim()).map((v) => v.name);
+      if (missing.length && !(await confirmDialog(h('div', null, 'These variables are empty: ', h('b', null, missing.join(', ')), '. Run anyway?'), { ok: 'Run' }))) return;
+      const a = p.agent ? S.get('agent', p.agent) : null;
+      const user = C.render(p.body, values, { fallback: (n, ph) => `[${ph || n}]` });
+      const system = a ? C.composeAgent(S.lib, C.normalizeItem(C.clone(a))) : 'You are an expert assistant. Follow the request precisely and answer in Markdown.';
+      const composed = { title: p.name, system, user, full: `${system}\n\n---\n\n${user}`, agent: a ? a.id : null, skills: [], files: [] };
+      const r = { state: 'running', engine: cfg.provider, startedAt: new Date().toISOString(), ctrl: new AbortController(), redraw: drawRun, values: Object.assign({}, values) };
+      runs[key] = r; drawRun();
+      try { r.output = String(await AIC.ai.callEngine(cfg, composed, r.ctrl.signal, { allowTools }) || '').trim(); r.state = 'done'; }
+      catch (e) { r.state = e.name === 'AbortError' ? 'cancelled' : 'error'; r.error = e.message; }
+      r.finishedAt = new Date().toISOString();
+      // History (Runs page, and runs/<id>/ when the folder is connected)
+      const run = { format: 'ai-center-run', kind: 'prompt', id: r.startedAt.replace(/[:.]/g, '-') + '-prompt-' + (p.id || 'draft'), prompt: p.id,
+        workflow: null, workflowName: '💬 ' + p.name, startedAt: r.startedAt, finishedAt: r.finishedAt, engine: cfg.provider,
+        status: r.state === 'done' ? 'completed' : r.state, inputs: Object.assign({}, values), results: {}, final: '',
+        steps: [{ nodeId: 'prompt', type: 'step', title: p.name, status: r.state === 'done' ? 'done' : 'error', output: r.output || '', error: r.state === 'error' ? r.error : undefined, prompt: composed, agent: composed.agent }] };
+      try { await S.saveRun(run, C.runReport(run, null)); } catch (e) { console.warn(e); }
+      if (!resBox.isConnected && r.redraw === drawRun) toast(`💬 ${p.name}: ${r.state === 'done' ? 'answer ready — open Use to see it (also in Runs)' : r.state}`, r.state === 'done' ? 'ok' : 'err', 5000);
+      if (r.redraw) r.redraw();
+    }
+    drawRun();
+    const runCard = h('div', { class: 'card card-pad', style: { marginTop: '12px' } },
+      h('div', { class: 'row', style: { marginBottom: '8px' } }, h('b', null, '▶ Run with AI'), h('div', { class: 'grow' }), runBtn),
+      panel, toolsBox, resBox);
+
     modal({
       title: p.name, titleIcon: p.icon || '💬', size: 'wide',
-      body: h('div', { class: 'grid', style: { gridTemplateColumns: vars.length ? '1fr 1.4fr' : '1fr', alignItems: 'start' } },
+      body: h('div', { class: 'grid', style: { gridTemplateColumns: vars.length ? 'minmax(0, 1fr) minmax(0, 1.4fr)' : 'minmax(0, 1fr)', alignItems: 'start' } },
         vars.length ? h('div', null, h('div', { class: 'muted small', style: { marginBottom: '10px' } }, p.description), ...fields) : null,
-        h('div', null, seg, out)),
+        h('div', null, seg, out, runCard)),
       foot: (close) => [
         h('span', { class: 'muted small', style: { marginRight: 'auto' } }, 'In Copilot (VS Code) you can also type ', h('code', null, '/' + p.id), ' after exporting.'),
         btn('Open Copilot M365', () => window.open('https://m365.cloud.microsoft/chat', '_blank'), { icon: 'export' }),
